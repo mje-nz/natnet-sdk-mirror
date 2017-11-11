@@ -5,6 +5,30 @@ This repository contains each version of NaturalPoint's [NatNet SDK](http://opti
 
 ## Changelog
 
+__2.8.0__ _(September 2, 2015)_
+
+Features & Enhancements
+
+* Added: Motive 1.8 streaming support
+* Added: New MATLAB wrapper sample.
+* Added: Add playback range and looping commands ("SetPlaybackStartFrame,frameNumber", "SetPlaybackStopFrame,frameNumber", "SetPlaybackLooping,0or1") to NatNet command list, and updated NatNet SDK Winforms and PacketClient samples to illustrate usage.
+* Added: DecodeID() helper routine, which illustrates usage in Winforms and SampleClient apps for decoding legacy marker ID
+* Added: Updated Unity3D streaming sample to stream rigid bodies and skeletons.
+* Added: Add Z-up quaternion to Euler decoding example to WinForms sample when streaming Z-up from Motive.
+* Added: Add support and examples for explicitly disconnecting Unicast clients.
+* Added: Add support for Z-up streaming, and update SampleClient 3D to illustrate usage.
+* Changed: (NatNetML only) Change GetLastFrameOfData() routine in managed client to lock the frame and return a copy of the data (polling clients only). Update WinForms sample app to illustrate usage.
+* Changed: (NatNetML only) Provide copy constructors to simplify .NET client data deep copy operations, and update Winforms sample with data copy operation.
+* Changed: (NatNetML only) Fix graphing for correct frame alignment for Motive.
+* Changed: (NatNetML only) Add timing testing operations and reporting.
+
+Fixes
+
+* Fixed: Fix for PointCloud solved bit indicator.
+* Fixed: Debug x64 WinformsSample was not compiling out of the box.
+* Fixed: RigidBody tracked flag in managed clients is now transmitted correctly.
+
+
 __2.7__ _(October 21, 2014)_
 
 Features & Enhancements

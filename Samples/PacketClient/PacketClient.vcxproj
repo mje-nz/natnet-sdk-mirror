@@ -131,7 +131,7 @@
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <TargetMachine>MachineX86</TargetMachine>
-      <AdditionalLibraryDirectories>$(NP_BUILD_OUTPUT)\$(PlatformToolset)-$(PlatformShortName)-$(ConfigurationBaseName)\</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>..\..\lib;</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">

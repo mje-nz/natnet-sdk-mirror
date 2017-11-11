@@ -130,7 +130,7 @@
     </ClCompile>
     <Link>
       <AdditionalDependencies>NatNetLib.lib;ws2_32.lib;winmm.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>$(NP_BUILD_OUTPUT)\$(PlatformToolset)-$(PlatformShortName)-$(Configuration)\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>..\..\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <SubSystem>Console</SubSystem>
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>

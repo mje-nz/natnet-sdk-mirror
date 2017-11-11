@@ -41,6 +41,8 @@ public class Body : MonoBehaviour {
 		XmlDocument xmlDoc= new XmlDocument();
 		xmlDoc.LoadXml(Packet);
 
+        //== skeletons ==--
+
 		XmlNodeList boneList = xmlDoc.GetElementsByTagName("Bone");
 
 		for(int index=0; index<boneList.Count; index++)
@@ -89,6 +91,57 @@ public class Body : MonoBehaviour {
 			bone.transform.position = position;
 			bone.transform.rotation = orientation;
 		}
+
+        //== rigid bodies ==--
+
+        XmlNodeList rbList = xmlDoc.GetElementsByTagName("RigidBody");
+
+        for (int index = 0; index < rbList.Count; index++)
+        {
+
+            int id = System.Convert.ToInt32(rbList[index].Attributes["ID"].InnerText);
+
+            float x = (float)System.Convert.ToDouble(rbList[index].Attributes["x"].InnerText);
+            float y = (float)System.Convert.ToDouble(rbList[index].Attributes["y"].InnerText);
+            float z = (float)System.Convert.ToDouble(rbList[index].Attributes["z"].InnerText);
+
+            float qx = (float)System.Convert.ToDouble(rbList[index].Attributes["qx"].InnerText);
+            float qy = (float)System.Convert.ToDouble(rbList[index].Attributes["qy"].InnerText);
+            float qz = (float)System.Convert.ToDouble(rbList[index].Attributes["qz"].InnerText);
+            float qw = (float)System.Convert.ToDouble(rbList[index].Attributes["qw"].InnerText);
+
+            //== coordinate system conversion (right to left handed) ==--
+
+            z = -z;
+            qz = -qz;
+            qw = -qw;
+
+            //== bone pose ==--
+
+            Vector3 position = new Vector3(x, y, z);
+            Quaternion orientation = new Quaternion(qx, qy, qz, qw);
+
+            //== locate or create bone object ==--
+
+            string objectName = "RigidBody" + id.ToString();
+
+            GameObject bone;
+
+            bone = GameObject.Find(objectName);
+
+            if (bone == null)
+            {
+                bone = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                Vector3 scale = new Vector3(0.1f, 0.1f, 0.1f);
+                bone.transform.localScale = scale;
+                bone.name = objectName;
+            }
+
+            //== set bone's pose ==--
+
+            bone.transform.position = position;
+            bone.transform.rotation = orientation;
+        }
 	}
 	
 	// Update is called once per frame

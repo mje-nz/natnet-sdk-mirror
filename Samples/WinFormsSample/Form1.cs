@@ -50,16 +50,16 @@ namespace WinFormTestApp
     {
         // [NatNet] Our NatNet object
         private NatNetML.NatNetClientML m_NatNet;
-        
+
         // [NatNet] Our NatNet Frame of Data object
         private NatNetML.FrameOfMocapData m_FrameOfData = new NatNetML.FrameOfMocapData();
-    
+
         // [NatNet] Description of the Active Model List from the server (e.g. Motive)
         NatNetML.ServerDescription desc = new NatNetML.ServerDescription();
 
         // [NatNet] Queue holding our incoming mocap frames the NatNet server (e.g. Motive)
         private Queue<NatNetML.FrameOfMocapData> m_FrameQueue = new Queue<NatNetML.FrameOfMocapData>();
-        
+
         // spreadsheet lookup
         Hashtable htMarkers = new Hashtable();
         Hashtable htRigidBodies = new Hashtable();
@@ -67,28 +67,29 @@ namespace WinFormTestApp
 
         // graphing support
         const int GraphFrames = 500;
-        long m_FrameCounter = 0;
         int m_iLastFrameNumber = 0;
 
         // frame timing information
         double m_fLastFrameTimestamp = 0.0f;
         float m_fCurrentMocapFrameTimestamp = 0.0f;
-		float m_fFirstMocapFrameTimestamp = 0.0f;
-        HiResTimer timer;
-        Int64 lastTime = 0;
+        float m_fFirstMocapFrameTimestamp = 0.0f;
+        QueryPerfCounter m_FramePeriodTimer = new QueryPerfCounter();
+        QueryPerfCounter m_UIUpdateTimer = new QueryPerfCounter();
+
+        int mLastFrame = 0;
 
         // server information
         double m_ServerFramerate = 1.0f;
         float m_ServerToMillimeters = 1.0f;
-        
-        private static object syncLock = new object(); 
+        int m_UpAxis = 1;   // 0=x, 1=y, 2=z (Y default)
+
+        private static object syncLock = new object();
         private delegate void OutputMessageCallback(string strMessage);
         private bool needMarkerListUpdate = false;
 
         public Form1()
         {
             InitializeComponent();
-            timer = new HiResTimer();
         }
 
         private void Form1_Load(object sender, EventArgs e)
@@ -96,7 +97,7 @@ namespace WinFormTestApp
             // Show available ip addresses of this machine
             String strMachineName = Dns.GetHostName();
             IPHostEntry ipHost = Dns.GetHostByName(strMachineName);
-            foreach(IPAddress ip in ipHost.AddressList)
+            foreach (IPAddress ip in ipHost.AddressList)
             {
                 string strIP = ip.ToString();
                 comboBoxLocal.Items.Add(strIP);
@@ -124,7 +125,7 @@ namespace WinFormTestApp
         private int CreateClient(int iConnectionType)
         {
             // release any previous instance
-            if(m_NatNet != null)
+            if (m_NatNet != null)
             {
                 m_NatNet.Uninitialize();
             }
@@ -135,7 +136,7 @@ namespace WinFormTestApp
             // [NatNet] set a "Frame Ready" callback function (event handler) handler that will be
             // called by NatNet when NatNet receives a frame of data from the server application
             m_NatNet.OnFrameReady += new NatNetML.FrameReadyEventHandler(m_NatNet_OnFrameReady);
-            
+
             /*
             // [NatNet] for testing only - event signature format required by some types of .NET applications (e.g. MatLab)
             m_NatNet.OnFrameReady2 += new FrameReadyEventHandler2(m_NatNet_OnFrameReady2);
@@ -144,11 +145,10 @@ namespace WinFormTestApp
             // [NatNet] print version info
             int[] ver = new int[4];
             ver = m_NatNet.NatNetVersion();
-            String strVersion = String.Format("NatNet Version : {0}.{1}.{2}.{3}", ver[0], ver[1],ver[2],ver[3]);
+            String strVersion = String.Format("NatNet Version : {0}.{1}.{2}.{3}", ver[0], ver[1], ver[2], ver[3]);
             OutputMessage(strVersion);
 
             return 0;
-            
         }
 
         /// <summary>
@@ -202,6 +202,14 @@ namespace WinFormTestApp
                     }
                 }
 
+                // [NatNet] [optional] Query mocap server for the current up axis
+                rc = m_NatNet.SendMessageAndWait("UpAxis", out response, out nBytes);
+                if (rc == 0)
+                {
+                    m_UpAxis = BitConverter.ToInt32(response, 0);
+                }
+
+
                 m_fCurrentMocapFrameTimestamp = 0.0f;
                 m_fFirstMocapFrameTimestamp = 0.0f;
             }
@@ -217,6 +225,16 @@ namespace WinFormTestApp
         private void Disconnect()
         {
             // [NatNet] disconnect
+            // optional : for unicast clients only - notify Motive we are disconnecting
+            int nBytes = 0;
+            byte[] response = new byte[10000];
+            int rc;
+            rc = m_NatNet.SendMessageAndWait("Disconnect", out response, out nBytes);
+            if (rc == 0)
+            {
+
+            }
+            // shutdown our client socket
             m_NatNet.Uninitialize();
             checkBoxConnect.Text = "Connect";
         }
@@ -237,9 +255,9 @@ namespace WinFormTestApp
         {
             if (this.listView1.InvokeRequired)
             {
-                // It's on a different thread, so use Invoke.
+                // It's on a different thread, so use Invoke
                 OutputMessageCallback d = new OutputMessageCallback(OutputMessage);
-                this.Invoke(d, new object[] { strMessage});
+                this.Invoke(d, new object[] { strMessage });
             }
             else
             {
@@ -250,20 +268,18 @@ namespace WinFormTestApp
                 item.SubItems.Add(strMessage);
                 listView1.Items.Add(item);
             }
-
         }
 
         private RigidBody FindRB(int id)
         {
-            foreach(RigidBody rb in mRigidBodies)
+            foreach (RigidBody rb in mRigidBodies)
             {
-                if(rb.ID == id)
+                if (rb.ID == id)
                     return rb;
             }
             return null;
         }
 
-        
         /// <summary>
         /// Redraw the graph using the data of the selected cell in the spreadsheet
         /// </summary>
@@ -274,12 +290,12 @@ namespace WinFormTestApp
             iFrame %= GraphFrames;
 
             // clear graph if we've wrapped, allow for fudge
-            if( (m_iLastFrameNumber - iFrame) > 400)
+            if ((m_iLastFrameNumber - iFrame) > 400)
             {
                 chart1.Series[0].Points.Clear();
             }
 
-            if (dataGridView1.SelectedCells.Count>0)
+            if (dataGridView1.SelectedCells.Count > 0)
             {
                 // use only the first selected cell
                 DataGridViewCell cell = dataGridView1.SelectedCells[0];
@@ -289,7 +305,6 @@ namespace WinFormTestApp
                 if (!Double.TryParse(cell.Value.ToString(), out dValue))
                     return;
                 chart1.Series[0].Points.AddXY(iFrame, (float)dValue);
-
             }
 
             // update red 'cursor' line
@@ -313,7 +328,7 @@ namespace WinFormTestApp
                 {
                     string strUniqueName = ms.MarkerSetName + j.ToString();
                     int key = strUniqueName.GetHashCode();
-                    if(htMarkers.Contains(key))
+                    if (htMarkers.Contains(key))
                     {
                         int rowIndex = (int)htMarkers[key];
                         if (rowIndex >= 0)
@@ -329,17 +344,17 @@ namespace WinFormTestApp
             // update RigidBody data
             for (int i = 0; i < m_FrameOfData.nRigidBodies; i++)
             {
-                NatNetML.RigidBodyData rb = m_FrameOfData.RigidBodies[i];              
+                NatNetML.RigidBodyData rb = m_FrameOfData.RigidBodies[i];
                 int key = rb.ID.GetHashCode();
-          
+
                 // note : must add rb definitions here one time instead of on get data descriptions because we don't know the marker list yet.
-                if(!htRigidBodies.ContainsKey(key))
+                if (!htRigidBodies.ContainsKey(key))
                 {
                     // Add RigidBody def to the grid
-                    if(rb.Markers[0].ID != -1)
+                    if (rb.Markers[0].ID != -1)
                     {
                         RigidBody rbDef = FindRB(rb.ID);
-                        if(rbDef != null)
+                        if (rbDef != null)
                         {
                             int rowIndex = dataGridView1.Rows.Add("RigidBody: " + rbDef.Name);
                             key = rb.ID.GetHashCode();
@@ -359,24 +374,40 @@ namespace WinFormTestApp
                 {
                     // update RigidBody data
                     int rowIndex = (int)htRigidBodies[key];
-                    if(rowIndex >= 0)
+                    if (rowIndex >= 0)
                     {
+                        bool tracked = rb.Tracked;
+                        if (!tracked)
+                        {
+                            OutputMessage("RigidBody not tracked in this frame.");
+                        }
+
                         dataGridView1.Rows[rowIndex].Cells[1].Value = rb.x * m_ServerToMillimeters;
                         dataGridView1.Rows[rowIndex].Cells[2].Value = rb.y * m_ServerToMillimeters;
                         dataGridView1.Rows[rowIndex].Cells[3].Value = rb.z * m_ServerToMillimeters;
 
                         // Convert quaternion to eulers.  Motive coordinate conventions: X(Pitch), Y(Yaw), Z(Roll), Relative, RHS
-                        float[] quat = new float[4] {rb.qx, rb.qy, rb.qz, rb.qw};
+                        float[] quat = new float[4] { rb.qx, rb.qy, rb.qz, rb.qw };
                         float[] eulers = new float[3];
                         eulers = m_NatNet.QuatToEuler(quat, (int)NATEulerOrder.NAT_XYZr);
                         double x = RadiansToDegrees(eulers[0]);     // convert to degrees
                         double y = RadiansToDegrees(eulers[1]);
                         double z = RadiansToDegrees(eulers[2]);
 
+                        /*
+                        if (m_UpAxis == 2)
+                        {
+                            double yOriginal = y;
+                            y = -z;
+                            z = yOriginal;
+                        }
+                        */
+
+
                         dataGridView1.Rows[rowIndex].Cells[4].Value = x;
                         dataGridView1.Rows[rowIndex].Cells[5].Value = y;
                         dataGridView1.Rows[rowIndex].Cells[6].Value = z;
-                              
+
                         // update Marker data associated with this rigid body
                         for (int j = 0; j < rb.nMarkers; j++)
                         {
@@ -399,14 +430,14 @@ namespace WinFormTestApp
                             }
                         }
                     }
-                }   
+                }
             }
 
             // update Skeleton data
             for (int i = 0; i < m_FrameOfData.nSkeletons; i++)
             {
                 NatNetML.SkeletonData sk = m_FrameOfData.Skeletons[i];
-                for(int j=0; j<sk.nRigidBodies; j++)
+                for (int j = 0; j < sk.nRigidBodies; j++)
                 {
                     // note : skeleton rigid body ids are of the form:
                     // parent skeleton ID   : high word (upper 16 bits of int)
@@ -451,22 +482,24 @@ namespace WinFormTestApp
             // update labeled markers data
             // remove previous dynamic marker list
             // for testing only - this simple approach to grid updating too slow for large marker count use
-            if(false)
+            if (false)
             {
-                int nRows = htMarkers.Count+htRigidBodies.Count;
+                int nRows = htMarkers.Count + htRigidBodies.Count;
                 int nTotalRows = dataGridView1.Rows.Count;
-                for(int i = nRows; i < nTotalRows; i++)
+                for (int i = nRows; i < nTotalRows; i++)
                     dataGridView1.Rows.RemoveAt(nRows);
                 for (int i = 0; i < m_FrameOfData.nMarkers; i++)
                 {
                     NatNetML.Marker m = m_FrameOfData.LabeledMarkers[i];
-                    int rowIndex = dataGridView1.Rows.Add("Labeled Marker: " + m.ID);
+
+                    int modelID, markerID;
+                    m_NatNet.DecodeID(m.ID, out modelID, out markerID);
+                    int rowIndex = dataGridView1.Rows.Add("Labeled Marker (ModelID: " + modelID + "  MarkerID: " + markerID + ")");
                     dataGridView1.Rows[rowIndex].Cells[1].Value = m.x;
                     dataGridView1.Rows[rowIndex].Cells[2].Value = m.y;
                     dataGridView1.Rows[rowIndex].Cells[3].Value = m.z;
                 }
             }
-
         }
 
         /// <summary>
@@ -485,7 +518,7 @@ namespace WinFormTestApp
             OutputMessage("Retrieving Data Descriptions....");
             List<NatNetML.DataDescriptor> descs = new List<NatNetML.DataDescriptor>();
             bool bSuccess = m_NatNet.GetDataDescriptions(out descs);
-            if(bSuccess)
+            if (bSuccess)
             {
                 OutputMessage(String.Format("Retrieved {0} Data Descriptions....", descs.Count));
                 int iObject = 0;
@@ -494,26 +527,26 @@ namespace WinFormTestApp
                     iObject++;
 
                     // MarkerSets
-                    if (d.type == (int)NatNetML.DataDescriptorType.eMarkerSetData)                    
+                    if (d.type == (int)NatNetML.DataDescriptorType.eMarkerSetData)
                     {
-                        NatNetML.MarkerSet ms = (NatNetML.MarkerSet)d;                       
+                        NatNetML.MarkerSet ms = (NatNetML.MarkerSet)d;
                         OutputMessage("Data Def " + iObject.ToString() + " [MarkerSet]");
-                        
+
                         OutputMessage(" Name : " + ms.Name);
-                        OutputMessage(String.Format(" Markers ({0}) ",ms.nMarkers));
+                        OutputMessage(String.Format(" Markers ({0}) ", ms.nMarkers));
                         dataGridView1.Rows.Add("MarkerSet: " + ms.Name);
-                        for(int i=0; i<ms.nMarkers; i++)
+                        for (int i = 0; i < ms.nMarkers; i++)
                         {
                             OutputMessage(("  " + ms.MarkerNames[i]));
                             int rowIndex = dataGridView1.Rows.Add("  " + ms.MarkerNames[i]);
                             // MarkerNameIndexToRow map
                             String strUniqueName = ms.Name + i.ToString();
                             int key = strUniqueName.GetHashCode();
-                            htMarkers.Add(key, rowIndex); 
+                            htMarkers.Add(key, rowIndex);
                         }
                     }
                     // RigidBodies
-                    else if (d.type == (int)NatNetML.DataDescriptorType.eRigidbodyData)             
+                    else if (d.type == (int)NatNetML.DataDescriptorType.eRigidbodyData)
                     {
                         NatNetML.RigidBody rb = (NatNetML.RigidBody)d;
 
@@ -524,10 +557,10 @@ namespace WinFormTestApp
                         OutputMessage(" OffsetX : " + rb.offsetx);
                         OutputMessage(" OffsetY : " + rb.offsety);
                         OutputMessage(" OffsetZ : " + rb.offsetz);
-                     
+
                         mRigidBodies.Add(rb);
 
-                        int rowIndex = dataGridView1.Rows.Add("RigidBody: "+rb.Name);
+                        int rowIndex = dataGridView1.Rows.Add("RigidBody: " + rb.Name);
                         // RigidBodyIDToRow map
                         int key = rb.ID.GetHashCode();
                         htRigidBodies.Add(key, rowIndex);
@@ -591,43 +624,66 @@ namespace WinFormTestApp
         /// <param name="client">The NatNet client instance</param>
         void m_NatNet_OnFrameReady(NatNetML.FrameOfMocapData data, NatNetML.NatNetClientML client)
         {
-            // [optional] High-resolution frame arrival timing information
-            Int64 currTime = timer.Value;
-            if(lastTime !=0)
+            double elapsedIntraMS = 0.0f;
+            QueryPerfCounter intraTimer = new QueryPerfCounter();
+            intraTimer.Start();
+
+            // check and report frame arrival period (time elapsed since previous frame arrived)
+            m_FramePeriodTimer.Stop();
+            double elapsedMS = m_FramePeriodTimer.Duration();
+            if ( (mLastFrame % 100) == 0)
             {
-                // Get time elapsed in tenths of a millisecond.
-                Int64 timeElapsedInTicks = currTime - lastTime;
-                Int64 timeElapseInTenthsOfMilliseconds = (timeElapsedInTicks * 10000) / timer.Frequency;
-                // uncomment for timing info
-                //OutputMessage("Frame Delivered: (" + timeElapseInTenthsOfMilliseconds.ToString() + ")  FrameTimestamp: " + data.fLatency);
+                OutputMessage("FrameID:" + data.iFrame + "   Timestamp: " + data.fTimestamp + "   Period:" + elapsedMS);
             }
 
+            // check and report frame drop
+            if ((mLastFrame != 0) && ((data.iFrame - mLastFrame) != 1))
+            {
+                OutputMessage("Frame Drop: ( ThisFrame: " + data.iFrame.ToString() + "  LastFrame: " + mLastFrame.ToString() + " )");
+            }
+            
             // [NatNet] Add the incoming frame of mocap data to our frame queue,  
             // Note: the frame queue is a shared resource with the UI thread, so lock it while writing
-             lock(syncLock)
+            lock (syncLock)
             {
                 // [optional] clear the frame queue before adding a new frame
                 m_FrameQueue.Clear();
-                m_FrameQueue.Enqueue(data);
+                FrameOfMocapData deepCopy = new FrameOfMocapData(data);
+                m_FrameQueue.Enqueue(deepCopy);
             }
-            lastTime = currTime;
+
+            intraTimer.Stop();
+            elapsedIntraMS = intraTimer.Duration();
+            if (elapsedIntraMS > 5.0f)
+            {
+                OutputMessage("Warning : Frame handler taking too long: " + elapsedIntraMS.ToString("F2"));
+            }
+
+            mLastFrame = data.iFrame;
+            m_FramePeriodTimer.Start();
+
         }
 
         // [NatNet] [optional] alternate function signatured frame ready callback handler for .NET applications/hosts
-        // that don't support the m_NatNet_OnFrameReady defiend above (e.g. MATLAB)
+        // that don't support the m_NatNet_OnFrameReady defined above (e.g. MATLAB)
         void m_NatNet_OnFrameReady2(object sender, NatNetEventArgs e)
         {
             m_NatNet_OnFrameReady(e.data, e.client);
         }
 
-
         /// <summary>
-        /// Refresh the UI at a fixed period specifid by the timer
+        /// Refresh the UI at a fixed period specified by the timer
         /// </summary>
         /// <param name="sender"></param>
         /// <param name="e"></param>
         private void UpdateUITimer_Tick(object sender, EventArgs e)
         {
+            m_UIUpdateTimer.Stop();
+            double interframeDuration = m_UIUpdateTimer.Duration();
+
+            QueryPerfCounter uiIntraFrameTimer = new QueryPerfCounter();
+            uiIntraFrameTimer.Start();
+
             // the frame queue is a shared resource with the FrameOfMocap delivery thread, so lock it while reading
             // note this can block the frame delivery thread.  In a production application frame queue management would be optimized.
             lock (syncLock)
@@ -635,16 +691,16 @@ namespace WinFormTestApp
                 while (m_FrameQueue.Count > 0)
                 {
                     m_FrameOfData = m_FrameQueue.Dequeue();
-                    
+
                     if (m_FrameQueue.Count > 0)
                         continue;
-                    
-                    if(m_FrameOfData != null)
+
+                    if (m_FrameOfData != null)
                     {
                         // for servers that only use timestamps, not frame numbers, calculate a 
                         // frame number from the time delta between frames
-                        if (desc.HostApp.Contains("TrackingTools") || desc.HostApp.Contains("Motive"))
-                        {                      
+                        if (desc.HostApp.Contains("TrackingTools"))
+                        {
                             m_fCurrentMocapFrameTimestamp = m_FrameOfData.fLatency;
                             if (m_fCurrentMocapFrameTimestamp == m_fLastFrameTimestamp)
                             {
@@ -662,8 +718,8 @@ namespace WinFormTestApp
                         UpdateDataGrid();
 
                         // update the chart
-                        UpdateChart(m_FrameCounter++);
-                        
+                        UpdateChart(m_FrameOfData.iFrame);
+
                         // only redraw chart when necessary, not for every frame
                         if (m_FrameQueue.Count == 0)
                         {
@@ -672,7 +728,7 @@ namespace WinFormTestApp
                             chart1.ChartAreas[0].AxisX.Maximum = GraphFrames;
                             chart1.Invalidate();
                         }
-                        
+
                         // Mocap server timestamp (in seconds)
                         m_fLastFrameTimestamp = m_FrameOfData.fTimestamp;
                         TimestampValue.Text = m_FrameOfData.fTimestamp.ToString("F3");
@@ -680,8 +736,8 @@ namespace WinFormTestApp
                         // SMPTE timecode (if timecode generator present)
                         int hour, minute, second, frame, subframe;
                         bool bSuccess = m_NatNet.DecodeTimecode(m_FrameOfData.Timecode, m_FrameOfData.TimecodeSubframe, out hour, out minute, out second, out frame, out subframe);
-                        if(bSuccess)
-                            TimecodeValue.Text = string.Format("{0:D2}:{1:D2}:{2:D2}:{3:D2}.{4:D2}",hour, minute, second, frame, subframe);
+                        if (bSuccess)
+                            TimecodeValue.Text = string.Format("{0:D2}:{1:D2}:{2:D2}:{3:D2}.{4:D2}", hour, minute, second, frame, subframe);
 
                         if (m_FrameOfData.bRecording)
                             chart1.BackColor = Color.Red;
@@ -690,6 +746,21 @@ namespace WinFormTestApp
                     }
                 }
             }
+
+            uiIntraFrameTimer.Stop();
+            double uiIntraFrameDuration = uiIntraFrameTimer.Duration();
+            m_UIUpdateTimer.Start();
+
+        }
+
+        public int LowWord(int number)
+        {
+            return number & 0xFFFF;
+        }
+
+        public int HighWord(int number)
+        {
+            return ((number >> 16) & 0xFFFF);
         }
 
         double RadiansToDegrees(double dRads)
@@ -707,7 +778,7 @@ namespace WinFormTestApp
             bool bNeedReconnect = checkBoxConnect.Checked;
             int iResult = CreateClient(0);
             if (bNeedReconnect)
-                Connect();               
+                Connect();
         }
 
         private void RadioUnicast_CheckedChanged(object sender, EventArgs e)
@@ -715,27 +786,17 @@ namespace WinFormTestApp
             bool bNeedReconnect = checkBoxConnect.Checked;
             int iResult = CreateClient(1);
             if (bNeedReconnect)
-                Connect();                         
-        }
-
-        public int LowWord(int number)
-        {
-            return number & 0xFFFF; 
-        }
-
-        public int HighWord(int number)
-        {
-            return ((number >> 16) & 0xFFFF); 
+                Connect();
         }
 
         private void RecordButton_Click(object sender, EventArgs e)
         {
             int nBytes = 0;
             byte[] response = new byte[10000];
-            int rc = m_NatNet.SendMessageAndWait("StartRecording", 1, 20, out response, out nBytes);
-            if( (rc!=0) || (response[0] !=1) )
+            int rc = m_NatNet.SendMessageAndWait("StartRecording", 3, 100, out response, out nBytes);
+            if (rc != 0)
             {
-            
+                OutputMessage("Warning : StartRecording return an error: " + rc.ToString("F2"));
             }
         }
 
@@ -744,7 +805,6 @@ namespace WinFormTestApp
             int nBytes = 0;
             byte[] response = new byte[10000];
             int rc = m_NatNet.SendMessageAndWait("StopRecording", out response, out nBytes);
-
         }
 
         private void LiveModeButton_Click(object sender, EventArgs e)
@@ -752,7 +812,6 @@ namespace WinFormTestApp
             int nBytes = 0;
             byte[] response = new byte[10000];
             int rc = m_NatNet.SendMessageAndWait("LiveMode", out response, out nBytes);
-
         }
 
         private void EditModeButton_Click(object sender, EventArgs e)
@@ -760,7 +819,6 @@ namespace WinFormTestApp
             int nBytes = 0;
             byte[] response = new byte[10000];
             int rc = m_NatNet.SendMessageAndWait("EditMode", out response, out nBytes);
-
         }
 
         private void TimelinePlayButton_Click(object sender, EventArgs e)
@@ -792,73 +850,164 @@ namespace WinFormTestApp
             String strCommand = "SetPlaybackTakeName," + PlaybackTakeNameText.Text;
             int rc = m_NatNet.SendMessageAndWait(strCommand, out response, out nBytes);
         }
-    }
 
-    /// <summary>
-    /// [Optional] HiResTimer is a high-resolution timer utility for measuring mocap frame arrival times.
-    /// </summary>
-    public class HiResTimer
-    {
-        private bool isPerfCounterSupported = false;
-        private Int64 frequency = 0;
-
-        private const string lib = "Kernel32.dll";
-        [DllImport(lib)]
-        private static extern int QueryPerformanceCounter(ref Int64 count);
-        [DllImport(lib)]
-        private static extern int QueryPerformanceFrequency(ref Int64 frequency);
-
-        public HiResTimer()
+        private void GetLastFrameOfDataButton_Click(object sender, EventArgs e)
         {
-            // Query the high-resolution timer only if it is supported. 
-            // A returned frequency of 1000 typically indicates that it is not 
-            // supported and is emulated by the OS using the same value that is 
-            // returned by Environment.TickCount. 
-            // A return value of 0 indicates that the performance counter is 
-            // not supported. 
-            int returnVal = QueryPerformanceFrequency(ref frequency);
+            // [NatNet] GetLastFrameOfData can be used to poll for the most recent avail frame of mocap data.
+            // This mechanism is slower than the event handler mechanism, and in general is not recommended,
+            // since it must wait for a frame to become available and apply a lock to that frame while it copies
+            // the data to the returned value.
 
-            if (returnVal != 0 && frequency != 1000)
+            // get a copy of the most recent frame of data
+            // returns null if not available or cannot obtain a lock on it within a specified timeout
+            FrameOfMocapData data = m_NatNet.GetLastFrameOfData();
+            if(data != null)
             {
-                // The performance counter is supported.
-                isPerfCounterSupported = true;
+                // do something with the data
+                String frameInfo = String.Format("FrameID : {0}", data.iFrame);
+                OutputMessage(frameInfo);
+            }
+        }
+
+        private void TestButton_Click(object sender, EventArgs e)
+        {
+            int nBytes = 0;
+            byte[] response = new byte[10000];
+            int testVal;
+            String command;
+            int returnCode;
+
+            command = "SetPlaybackTakeName," + PlaybackTakeNameText.Text;
+            OutputMessage("Sending " + command);
+            returnCode = m_NatNet.SendMessageAndWait(command, out response, out nBytes);
+            // process return codes
+            if (returnCode != 0)
+            {
+                OutputMessage(command + " not handled by server");
             }
             else
             {
-                // The performance counter is not supported. Use 
-                // Environment.TickCount instead.
-                frequency = 1000;
-            }
-        }
-
-        public Int64 Frequency
-        {
-            get
-            {
-                return frequency;
-            }
-        }
-
-        public Int64 Value
-        {
-            get
-            {
-                Int64 tickCount = 0;
-
-                if (isPerfCounterSupported)
-                {
-                    // Get the value here if the counter is supported.
-                    QueryPerformanceCounter(ref tickCount);
-                    return tickCount;
-                }
+                int opResult = System.BitConverter.ToInt32(response, 0);
+                if (opResult == 0)
+                    OutputMessage(command + " handled and succeeded.");
                 else
-                {
-                    // Otherwise, use Environment.TickCount. 
-                    return (Int64)Environment.TickCount;
-                }
+                    OutputMessage(command + " handled but failed.");
+            }
+
+            testVal = 25;
+            command = "SetPlaybackStartFrame," + testVal.ToString();
+            OutputMessage("Sending " + command);
+            returnCode = m_NatNet.SendMessageAndWait(command, out response, out nBytes);
+            // process return codes
+            if (returnCode != 0)
+            {
+                OutputMessage(command + " not handled by server");
+            }
+            else
+            {
+                int opResult = System.BitConverter.ToInt32(response, 0);
+                if(opResult==0)
+                    OutputMessage(command + " handled and succeeded.");
+                else
+                    OutputMessage(command +  " handled but failed.");
+            }
+               
+            testVal = 50;
+            command = "SetPlaybackStopFrame," + testVal.ToString();
+            OutputMessage("Sending " + command);
+            returnCode = m_NatNet.SendMessageAndWait(command, out response, out nBytes);
+            if (returnCode != 0)
+            {
+                OutputMessage("SetPlaybackStartFrame not handled by server");
+            }
+            else
+            {
+                int opResult = System.BitConverter.ToInt32(response, 0);
+                if (opResult == 0)
+                    OutputMessage(command + " handled and succeeded.");
+                else
+                    OutputMessage(command + " handled but failed.");
+            }
+
+            testVal = 0;
+            command = "SetPlaybackLooping," + testVal.ToString();
+            OutputMessage("Sending " + command);
+            returnCode = m_NatNet.SendMessageAndWait(command, out response, out nBytes);
+            if (returnCode != 0)
+            {
+                OutputMessage("SetPlaybackStartFrame not handled by server");
+            }
+            else
+            {
+                int opResult = System.BitConverter.ToInt32(response, 0);
+                if (opResult == 0)
+                    OutputMessage(command + " handled and succeeded.");
+                else
+                    OutputMessage(command + " handled but failed.");
+            }
+
+            testVal = 35;
+            OutputMessage("Sending " + command);
+            command = "SetPlaybackCurrentFrame," + testVal.ToString();
+            returnCode = m_NatNet.SendMessageAndWait(command, out response, out nBytes);
+            if (returnCode != 0)
+            {
+                OutputMessage("SetPlaybackStartFrame not handled by server");
+            }
+            else
+            {
+                int opResult = System.BitConverter.ToInt32(response, 0);
+                if (opResult == 0)
+                    OutputMessage(command + " handled and succeeded.");
+                else
+                    OutputMessage(command + " handled but failed.");
+            }
+
+        }
+
+    }
+
+    // Wrapper class for the windows high performance timer QueryPerfCounter
+    // ( adapted from MSDN https://msdn.microsoft.com/en-us/library/ff650674.aspx )
+    public class QueryPerfCounter
+    {
+        [DllImport("KERNEL32")]
+        private static extern bool QueryPerformanceCounter(out long lpPerformanceCount);
+
+        [DllImport("Kernel32.dll")]
+        private static extern bool QueryPerformanceFrequency(out long lpFrequency);
+
+        private long start;
+        private long stop;
+        private long frequency;
+        Decimal multiplier = new Decimal(1.0e9);
+
+        public QueryPerfCounter()
+        {
+            if (QueryPerformanceFrequency(out frequency) == false)
+            {
+                // Frequency not supported
+                throw new Win32Exception();
             }
         }
 
+        public void Start()
+        {
+            QueryPerformanceCounter(out start);
+        }
+
+        public void Stop()
+        {
+            QueryPerformanceCounter(out stop);
+        }
+
+        // return elapsed time between start and stop, in milliseconds.
+        public double Duration()
+        {
+            double val = ((double)(stop - start) * (double)multiplier) / (double)frequency;
+            val = val / 1000000.0f;   // convert to ms
+            return val;
+        }
     }
 
 }

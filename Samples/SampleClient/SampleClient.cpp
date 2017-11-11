@@ -50,6 +50,8 @@ int CreateClient(int iConnectionType);
 
 unsigned int MyServersDataPort = 3130;
 unsigned int MyServersCommandPort = 3131;
+int iConnectionType = ConnectionType_Multicast;
+//int iConnectionType = ConnectionType_Unicast;
 
 NatNetClient* theClient;
 FILE* fp;
@@ -60,9 +62,7 @@ char szServerIPAddress[128] = "";
 int _tmain(int argc, _TCHAR* argv[])
 {
     int iResult;
-    int iConnectionType = ConnectionType_Multicast;
-    //int iConnectionType = ConnectionType_Unicast;
-    
+     
     // parse command line args
     if(argc>1)
     {
@@ -213,21 +213,30 @@ int _tmain(int argc, _TCHAR* argv[])
                 }
                 break;	
             case 'm':	                        // change to multicast
-                iResult = CreateClient(ConnectionType_Multicast);
+                iConnectionType = ConnectionType_Multicast;
+                iResult = CreateClient(iConnectionType);
                 if(iResult == ErrorCode_OK)
                     printf("Client connection type changed to Multicast.\n\n");
                 else
                     printf("Error changing client connection type to Multicast.\n\n");
                 break;
             case 'u':	                        // change to unicast
-                iResult = CreateClient(ConnectionType_Unicast);
+                iConnectionType = ConnectionType_Unicast;
+                iResult = CreateClient(iConnectionType);
                 if(iResult == ErrorCode_OK)
                     printf("Client connection type changed to Unicast.\n\n");
                 else
                     printf("Error changing client connection type to Unicast.\n\n");
                 break;
-
-
+            case 'c' :                          // connect
+                iResult = CreateClient(iConnectionType);
+                break;
+            case 'd' :                          // disconnect
+                // note: applies to unicast connections only - indicates to Motive to stop sending packets to that client endpoint
+                iResult = theClient->SendMessageAndWait("Disconnect", &response, &nBytes);
+                if (iResult == ErrorCode_OK)
+                    printf("[SampleClient] Disconnected");
+                break;
 			default:
 				break;
 		}
@@ -319,8 +328,8 @@ void __cdecl DataHandler(sFrameOfMocapData* data, void* pUserData)
     printf("Latency :  %3.2lf\n", data->fLatency);
     
     // FrameOfMocapData params
-    bool bIsRecording = data->params & 0x01;
-    bool bTrackedModelsChanged = data->params & 0x02;
+    bool bIsRecording = ((data->params & 0x01)!=0);
+    bool bTrackedModelsChanged = ((data->params & 0x02)!=0);
     if(bIsRecording)
         printf("RECORDING\n");
     if(bTrackedModelsChanged)
@@ -417,12 +426,14 @@ void __cdecl DataHandler(sFrameOfMocapData* data, void* pUserData)
 	printf("Labeled Markers [Count=%d]\n", data->nLabeledMarkers);
 	for(i=0; i < data->nLabeledMarkers; i++)
 	{
-        bOccluded = data->LabeledMarkers[i].params & 0x01;
-        bPCSolved = data->LabeledMarkers[i].params & 0x02;
-        bModelSolved = data->LabeledMarkers[i].params & 0x04;
+        bOccluded = ((data->LabeledMarkers[i].params & 0x01)!=0);
+        bPCSolved = ((data->LabeledMarkers[i].params & 0x02)!=0);
+        bModelSolved = ((data->LabeledMarkers[i].params & 0x04)!=0);
 		sMarker marker = data->LabeledMarkers[i];
-		printf("Labeled Marker [ID=%d, Occluded=%d, PCSolved=%d, ModelSolved=%d] [size=%3.2f] [pos=%3.2f,%3.2f,%3.2f]\n",
-            marker.ID, bOccluded, bPCSolved, bModelSolved,  marker.size, marker.x, marker.y, marker.z);
+        int modelID, markerID;
+        theClient->DecodeID(marker.ID, &modelID, &markerID);
+		printf("Labeled Marker [ModelID=%d, MarkerID=%d, Occluded=%d, PCSolved=%d, ModelSolved=%d] [size=%3.2f] [pos=%3.2f,%3.2f,%3.2f]\n",
+            modelID, markerID, bOccluded, bPCSolved, bModelSolved,  marker.size, marker.x, marker.y, marker.z);
 	}
 
 }

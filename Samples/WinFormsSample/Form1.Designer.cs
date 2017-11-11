@@ -30,17 +30,24 @@ namespace WinFormTestApp
         {
             this.components = new System.ComponentModel.Container();
             System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle1 = new System.Windows.Forms.DataGridViewCellStyle();
-            System.Windows.Forms.DataVisualization.Charting.ChartArea chartArea1 = new System.Windows.Forms.DataVisualization.Charting.ChartArea();
-            System.Windows.Forms.DataVisualization.Charting.Legend legend1 = new System.Windows.Forms.DataVisualization.Charting.Legend();
-            System.Windows.Forms.DataVisualization.Charting.Series series1 = new System.Windows.Forms.DataVisualization.Charting.Series();
-            System.Windows.Forms.DataVisualization.Charting.Title title1 = new System.Windows.Forms.DataVisualization.Charting.Title();
             System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle2 = new System.Windows.Forms.DataGridViewCellStyle();
             System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle3 = new System.Windows.Forms.DataGridViewCellStyle();
             System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle4 = new System.Windows.Forms.DataGridViewCellStyle();
             System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle5 = new System.Windows.Forms.DataGridViewCellStyle();
             System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle6 = new System.Windows.Forms.DataGridViewCellStyle();
             System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle7 = new System.Windows.Forms.DataGridViewCellStyle();
+            System.Windows.Forms.DataVisualization.Charting.ChartArea chartArea1 = new System.Windows.Forms.DataVisualization.Charting.ChartArea();
+            System.Windows.Forms.DataVisualization.Charting.Legend legend1 = new System.Windows.Forms.DataVisualization.Charting.Legend();
+            System.Windows.Forms.DataVisualization.Charting.Series series1 = new System.Windows.Forms.DataVisualization.Charting.Series();
+            System.Windows.Forms.DataVisualization.Charting.Title title1 = new System.Windows.Forms.DataVisualization.Charting.Title();
             this.dataGridView1 = new System.Windows.Forms.DataGridView();
+            this.ID = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.X = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.Y = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.Z = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.Yaw = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.Pitch = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.Roll = new System.Windows.Forms.DataGridViewTextBoxColumn();
             this.listView1 = new System.Windows.Forms.ListView();
             this.columnHeader1 = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
             this.columnHeader2 = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
@@ -67,19 +74,14 @@ namespace WinFormTestApp
             this.RadioUnicast = new System.Windows.Forms.RadioButton();
             this.RadioMulticast = new System.Windows.Forms.RadioButton();
             this.tabPage2 = new System.Windows.Forms.TabPage();
+            this.GetLastFrameOfDataButton = new System.Windows.Forms.Button();
             this.SetPlaybackTakeButton = new System.Windows.Forms.Button();
             this.PlaybackTakeNameText = new System.Windows.Forms.TextBox();
             this.StopRecordButton = new System.Windows.Forms.Button();
             this.SetRecordingTakeButton = new System.Windows.Forms.Button();
             this.RecordingTakeNameText = new System.Windows.Forms.TextBox();
             this.EditModeButton = new System.Windows.Forms.Button();
-            this.ID = new System.Windows.Forms.DataGridViewTextBoxColumn();
-            this.X = new System.Windows.Forms.DataGridViewTextBoxColumn();
-            this.Y = new System.Windows.Forms.DataGridViewTextBoxColumn();
-            this.Z = new System.Windows.Forms.DataGridViewTextBoxColumn();
-            this.Yaw = new System.Windows.Forms.DataGridViewTextBoxColumn();
-            this.Pitch = new System.Windows.Forms.DataGridViewTextBoxColumn();
-            this.Roll = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.TestButton = new System.Windows.Forms.Button();
             ((System.ComponentModel.ISupportInitialize)(this.dataGridView1)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.chart1)).BeginInit();
             this.tabControl1.SuspendLayout();
@@ -117,8 +119,84 @@ namespace WinFormTestApp
             this.dataGridView1.RowHeadersVisible = false;
             this.dataGridView1.RowTemplate.ReadOnly = true;
             this.dataGridView1.SelectionMode = System.Windows.Forms.DataGridViewSelectionMode.CellSelect;
-            this.dataGridView1.Size = new System.Drawing.Size(560, 345);
+            this.dataGridView1.Size = new System.Drawing.Size(560, 429);
             this.dataGridView1.TabIndex = 1;
+            // 
+            // ID
+            // 
+            this.ID.AutoSizeMode = System.Windows.Forms.DataGridViewAutoSizeColumnMode.None;
+            this.ID.FillWeight = 62.07922F;
+            this.ID.HeaderText = "ID";
+            this.ID.MinimumWidth = 50;
+            this.ID.Name = "ID";
+            this.ID.ReadOnly = true;
+            this.ID.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
+            // 
+            // X
+            // 
+            dataGridViewCellStyle2.Format = "N4";
+            dataGridViewCellStyle2.NullValue = null;
+            this.X.DefaultCellStyle = dataGridViewCellStyle2;
+            this.X.FillWeight = 22.52875F;
+            this.X.HeaderText = "X";
+            this.X.Name = "X";
+            this.X.ReadOnly = true;
+            this.X.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
+            // 
+            // Y
+            // 
+            dataGridViewCellStyle3.Format = "N2";
+            dataGridViewCellStyle3.NullValue = null;
+            this.Y.DefaultCellStyle = dataGridViewCellStyle3;
+            this.Y.FillWeight = 22.52875F;
+            this.Y.HeaderText = "Y";
+            this.Y.Name = "Y";
+            this.Y.ReadOnly = true;
+            this.Y.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
+            // 
+            // Z
+            // 
+            dataGridViewCellStyle4.Format = "N2";
+            dataGridViewCellStyle4.NullValue = null;
+            this.Z.DefaultCellStyle = dataGridViewCellStyle4;
+            this.Z.FillWeight = 22.52875F;
+            this.Z.HeaderText = "Z";
+            this.Z.Name = "Z";
+            this.Z.ReadOnly = true;
+            this.Z.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
+            // 
+            // Yaw
+            // 
+            dataGridViewCellStyle5.Format = "N2";
+            dataGridViewCellStyle5.NullValue = null;
+            this.Yaw.DefaultCellStyle = dataGridViewCellStyle5;
+            this.Yaw.FillWeight = 22.52875F;
+            this.Yaw.HeaderText = "Pitch (X)";
+            this.Yaw.Name = "Yaw";
+            this.Yaw.ReadOnly = true;
+            this.Yaw.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
+            // 
+            // Pitch
+            // 
+            dataGridViewCellStyle6.Format = "N2";
+            dataGridViewCellStyle6.NullValue = null;
+            this.Pitch.DefaultCellStyle = dataGridViewCellStyle6;
+            this.Pitch.FillWeight = 22.52875F;
+            this.Pitch.HeaderText = "Yaw (Y)";
+            this.Pitch.Name = "Pitch";
+            this.Pitch.ReadOnly = true;
+            this.Pitch.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
+            // 
+            // Roll
+            // 
+            dataGridViewCellStyle7.Format = "N2";
+            dataGridViewCellStyle7.NullValue = null;
+            this.Roll.DefaultCellStyle = dataGridViewCellStyle7;
+            this.Roll.FillWeight = 22.52875F;
+            this.Roll.HeaderText = "Roll (Z)";
+            this.Roll.Name = "Roll";
+            this.Roll.ReadOnly = true;
+            this.Roll.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
             // 
             // listView1
             // 
@@ -130,9 +208,9 @@ namespace WinFormTestApp
             this.columnHeader2});
             this.listView1.GridLines = true;
             this.listView1.HeaderStyle = System.Windows.Forms.ColumnHeaderStyle.None;
-            this.listView1.Location = new System.Drawing.Point(578, 225);
+            this.listView1.Location = new System.Drawing.Point(578, 261);
             this.listView1.Name = "listView1";
-            this.listView1.Size = new System.Drawing.Size(363, 132);
+            this.listView1.Size = new System.Drawing.Size(363, 180);
             this.listView1.TabIndex = 3;
             this.listView1.UseCompatibleStateImageBehavior = false;
             this.listView1.View = System.Windows.Forms.View.Details;
@@ -202,7 +280,7 @@ namespace WinFormTestApp
             legend1.Position.X = 84.04308F;
             legend1.Position.Y = 4F;
             this.chart1.Legends.Add(legend1);
-            this.chart1.Location = new System.Drawing.Point(12, 363);
+            this.chart1.Location = new System.Drawing.Point(12, 447);
             this.chart1.Name = "chart1";
             series1.ChartArea = "ChartArea1";
             series1.ChartType = System.Windows.Forms.DataVisualization.Charting.SeriesChartType.FastLine;
@@ -215,7 +293,7 @@ namespace WinFormTestApp
             series1.MarkerStyle = System.Windows.Forms.DataVisualization.Charting.MarkerStyle.Circle;
             series1.Name = "Series1";
             this.chart1.Series.Add(series1);
-            this.chart1.Size = new System.Drawing.Size(929, 289);
+            this.chart1.Size = new System.Drawing.Size(929, 340);
             this.chart1.TabIndex = 12;
             this.chart1.Text = "chart1";
             title1.Font = new System.Drawing.Font("Segoe UI", 14.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
@@ -232,7 +310,7 @@ namespace WinFormTestApp
             this.label1.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
             this.label1.Font = new System.Drawing.Font("Microsoft Sans Serif", 10F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.label1.ForeColor = System.Drawing.SystemColors.ControlText;
-            this.label1.Location = new System.Drawing.Point(578, 201);
+            this.label1.Location = new System.Drawing.Point(578, 237);
             this.label1.Name = "label1";
             this.label1.Size = new System.Drawing.Size(363, 21);
             this.label1.TabIndex = 13;
@@ -293,7 +371,7 @@ namespace WinFormTestApp
             this.tabControl1.Location = new System.Drawing.Point(578, 12);
             this.tabControl1.Name = "tabControl1";
             this.tabControl1.SelectedIndex = 0;
-            this.tabControl1.Size = new System.Drawing.Size(363, 186);
+            this.tabControl1.Size = new System.Drawing.Size(363, 222);
             this.tabControl1.TabIndex = 21;
             // 
             // tabPage1
@@ -314,7 +392,7 @@ namespace WinFormTestApp
             this.tabPage1.Location = new System.Drawing.Point(4, 22);
             this.tabPage1.Name = "tabPage1";
             this.tabPage1.Padding = new System.Windows.Forms.Padding(3);
-            this.tabPage1.Size = new System.Drawing.Size(355, 160);
+            this.tabPage1.Size = new System.Drawing.Size(355, 184);
             this.tabPage1.TabIndex = 0;
             this.tabPage1.Text = "Connect";
             this.tabPage1.UseVisualStyleBackColor = true;
@@ -424,6 +502,8 @@ namespace WinFormTestApp
             // 
             // tabPage2
             // 
+            this.tabPage2.Controls.Add(this.TestButton);
+            this.tabPage2.Controls.Add(this.GetLastFrameOfDataButton);
             this.tabPage2.Controls.Add(this.SetPlaybackTakeButton);
             this.tabPage2.Controls.Add(this.PlaybackTakeNameText);
             this.tabPage2.Controls.Add(this.StopRecordButton);
@@ -437,10 +517,20 @@ namespace WinFormTestApp
             this.tabPage2.Location = new System.Drawing.Point(4, 22);
             this.tabPage2.Name = "tabPage2";
             this.tabPage2.Padding = new System.Windows.Forms.Padding(3);
-            this.tabPage2.Size = new System.Drawing.Size(355, 160);
+            this.tabPage2.Size = new System.Drawing.Size(355, 196);
             this.tabPage2.TabIndex = 1;
             this.tabPage2.Text = "Commands";
             this.tabPage2.UseVisualStyleBackColor = true;
+            // 
+            // GetLastFrameOfDataButton
+            // 
+            this.GetLastFrameOfDataButton.Location = new System.Drawing.Point(11, 160);
+            this.GetLastFrameOfDataButton.Name = "GetLastFrameOfDataButton";
+            this.GetLastFrameOfDataButton.Size = new System.Drawing.Size(99, 23);
+            this.GetLastFrameOfDataButton.TabIndex = 27;
+            this.GetLastFrameOfDataButton.Text = "Get Frame";
+            this.GetLastFrameOfDataButton.UseVisualStyleBackColor = true;
+            this.GetLastFrameOfDataButton.Click += new System.EventHandler(this.GetLastFrameOfDataButton_Click);
             // 
             // SetPlaybackTakeButton
             // 
@@ -496,88 +586,22 @@ namespace WinFormTestApp
             this.EditModeButton.UseVisualStyleBackColor = true;
             this.EditModeButton.Click += new System.EventHandler(this.EditModeButton_Click);
             // 
-            // ID
+            // TestButton
             // 
-            this.ID.AutoSizeMode = System.Windows.Forms.DataGridViewAutoSizeColumnMode.None;
-            this.ID.FillWeight = 62.07922F;
-            this.ID.HeaderText = "ID";
-            this.ID.MinimumWidth = 50;
-            this.ID.Name = "ID";
-            this.ID.ReadOnly = true;
-            this.ID.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
-            // 
-            // X
-            // 
-            dataGridViewCellStyle2.Format = "N4";
-            dataGridViewCellStyle2.NullValue = null;
-            this.X.DefaultCellStyle = dataGridViewCellStyle2;
-            this.X.FillWeight = 22.52875F;
-            this.X.HeaderText = "X";
-            this.X.Name = "X";
-            this.X.ReadOnly = true;
-            this.X.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
-            // 
-            // Y
-            // 
-            dataGridViewCellStyle3.Format = "N2";
-            dataGridViewCellStyle3.NullValue = null;
-            this.Y.DefaultCellStyle = dataGridViewCellStyle3;
-            this.Y.FillWeight = 22.52875F;
-            this.Y.HeaderText = "Y";
-            this.Y.Name = "Y";
-            this.Y.ReadOnly = true;
-            this.Y.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
-            // 
-            // Z
-            // 
-            dataGridViewCellStyle4.Format = "N2";
-            dataGridViewCellStyle4.NullValue = null;
-            this.Z.DefaultCellStyle = dataGridViewCellStyle4;
-            this.Z.FillWeight = 22.52875F;
-            this.Z.HeaderText = "Z";
-            this.Z.Name = "Z";
-            this.Z.ReadOnly = true;
-            this.Z.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
-            // 
-            // Yaw
-            // 
-            dataGridViewCellStyle5.Format = "N2";
-            dataGridViewCellStyle5.NullValue = null;
-            this.Yaw.DefaultCellStyle = dataGridViewCellStyle5;
-            this.Yaw.FillWeight = 22.52875F;
-            this.Yaw.HeaderText = "Pitch (X)";
-            this.Yaw.Name = "Yaw";
-            this.Yaw.ReadOnly = true;
-            this.Yaw.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
-            // 
-            // Pitch
-            // 
-            dataGridViewCellStyle6.Format = "N2";
-            dataGridViewCellStyle6.NullValue = null;
-            this.Pitch.DefaultCellStyle = dataGridViewCellStyle6;
-            this.Pitch.FillWeight = 22.52875F;
-            this.Pitch.HeaderText = "Yaw (Y)";
-            this.Pitch.Name = "Pitch";
-            this.Pitch.ReadOnly = true;
-            this.Pitch.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
-            // 
-            // Roll
-            // 
-            dataGridViewCellStyle7.Format = "N2";
-            dataGridViewCellStyle7.NullValue = null;
-            this.Roll.DefaultCellStyle = dataGridViewCellStyle7;
-            this.Roll.FillWeight = 22.52875F;
-            this.Roll.HeaderText = "Roll (Z)";
-            this.Roll.Name = "Roll";
-            this.Roll.ReadOnly = true;
-            this.Roll.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
+            this.TestButton.Location = new System.Drawing.Point(227, 131);
+            this.TestButton.Name = "TestButton";
+            this.TestButton.Size = new System.Drawing.Size(99, 23);
+            this.TestButton.TabIndex = 28;
+            this.TestButton.Text = "Test";
+            this.TestButton.UseVisualStyleBackColor = true;
+            this.TestButton.Click += new System.EventHandler(this.TestButton_Click);
             // 
             // Form1
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.BackColor = System.Drawing.Color.Gainsboro;
-            this.ClientSize = new System.Drawing.Size(953, 664);
+            this.ClientSize = new System.Drawing.Size(953, 799);
             this.Controls.Add(this.tabControl1);
             this.Controls.Add(this.label1);
             this.Controls.Add(this.chart1);
@@ -640,6 +664,8 @@ namespace WinFormTestApp
         private System.Windows.Forms.DataGridViewTextBoxColumn Yaw;
         private System.Windows.Forms.DataGridViewTextBoxColumn Pitch;
         private System.Windows.Forms.DataGridViewTextBoxColumn Roll;
+        private System.Windows.Forms.Button GetLastFrameOfDataButton;
+        private System.Windows.Forms.Button TestButton;
     }
 }
 

@@ -58,7 +58,7 @@ void GLPrint::Print(double x, double y, const char *format, ...)
 
   // parse formatted string/args into text string
   va_start(ap, format);									
-  vsprintf(text, format, ap);					
+  vsprintf_s(text, format, ap);					
   va_end(ap);											
 
   // wgl text

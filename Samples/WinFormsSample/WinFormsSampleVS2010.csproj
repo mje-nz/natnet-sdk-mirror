@@ -79,7 +79,7 @@
       <EmbedInteropTypes>True</EmbedInteropTypes>
     </Reference>
     <Reference Include="NatNetML">
-      <HintPath>..\..\..\NatNetLib\Release\NatNetML.dll</HintPath>
+      <HintPath>..\..\lib\NatNetML.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Data" />

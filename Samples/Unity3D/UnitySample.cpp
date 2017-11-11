@@ -14,6 +14,7 @@
 //=============================================================================
 
 
+
 /*
 
 UnitySample.cpp
@@ -306,32 +307,64 @@ void SendFrameToUnity(sFrameOfMocapData *data, void *pUserData)
         TiXmlDeclaration* decl = new TiXmlDeclaration( "1.0", "", "" );  
         doc.LinkEndChild( decl );  
 
-        TiXmlElement * root = new TiXmlElement( "Skeleton" );  
+        TiXmlElement * root = new TiXmlElement( "Stream" );  
         doc.LinkEndChild( root );  
 
-        TiXmlElement * bones = new TiXmlElement( "Bones" );  
-        root->LinkEndChild( bones );  
+        TiXmlElement * skeletons = new TiXmlElement( "Skeletons" );  
+        root->LinkEndChild( skeletons );  
 
-        TiXmlElement * bone;
+        // skeletons first
 
-        sSkeletonData skData = data->Skeletons[0]; // first skeleton ==--
-
-        for(int i=0; i<skData.nRigidBodies; i++)
+        for( int i=0; i<data->nSkeletons; i++ )
         {
-            sRigidBodyData rbData = skData.RigidBodyData[i];
+            TiXmlElement * skeleton = new TiXmlElement( "Skeleton" );  
+            skeletons->LinkEndChild( skeleton );  
 
-            bone = new TiXmlElement( "Bone" );  
-            bones->LinkEndChild( bone );  
+            TiXmlElement * bone;
 
-            bone->SetAttribute      ("ID"  , rbData.ID);
-            bone->SetAttribute      ("Name", gBoneNames[LOWORD(rbData.ID)].c_str());
-            bone->SetDoubleAttribute("x"   , rbData.x);
-            bone->SetDoubleAttribute("y"   , rbData.y);
-            bone->SetDoubleAttribute("z"   , rbData.z);
-            bone->SetDoubleAttribute("qx"  , rbData.qx);
-            bone->SetDoubleAttribute("qy"  , rbData.qy);
-            bone->SetDoubleAttribute("qz"  , rbData.qz);
-            bone->SetDoubleAttribute("qw"  , rbData.qw);
+            sSkeletonData skData = data->Skeletons[i]; // first skeleton ==--
+
+            skeleton->SetAttribute("ID"  , skData.skeletonID);
+
+            for(int i=0; i<skData.nRigidBodies; i++)
+            {
+                sRigidBodyData rbData = skData.RigidBodyData[i];
+
+                bone = new TiXmlElement( "Bone" );  
+                skeleton->LinkEndChild( bone );  
+
+                bone->SetAttribute      ("ID"  , rbData.ID);
+                bone->SetAttribute      ("Name", gBoneNames[LOWORD(rbData.ID)].c_str());
+                bone->SetDoubleAttribute("x"   , rbData.x);
+                bone->SetDoubleAttribute("y"   , rbData.y);
+                bone->SetDoubleAttribute("z"   , rbData.z);
+                bone->SetDoubleAttribute("qx"  , rbData.qx);
+                bone->SetDoubleAttribute("qy"  , rbData.qy);
+                bone->SetDoubleAttribute("qz"  , rbData.qz);
+                bone->SetDoubleAttribute("qw"  , rbData.qw);
+            }
+        }
+        
+        // rigid bodies ==--
+
+        TiXmlElement * rigidBodies = new TiXmlElement( "RigidBodies" );  
+        root->LinkEndChild( rigidBodies );  
+
+        for( int i=0; i<data->nRigidBodies; i++ )
+        {
+            sRigidBodyData rbData = data->RigidBodies[i];
+
+            TiXmlElement * rb = new TiXmlElement( "RigidBody" );  
+            rigidBodies->LinkEndChild( rb );  
+
+            rb->SetAttribute      ("ID"  , rbData.ID);
+            rb->SetDoubleAttribute("x"   , rbData.x);
+            rb->SetDoubleAttribute("y"   , rbData.y);
+            rb->SetDoubleAttribute("z"   , rbData.z);
+            rb->SetDoubleAttribute("qx"  , rbData.qx);
+            rb->SetDoubleAttribute("qy"  , rbData.qy);
+            rb->SetDoubleAttribute("qz"  , rbData.qz);
+            rb->SetDoubleAttribute("qw"  , rbData.qw);
         }
 
         // convert xml document into a buffer filled with data ==--
@@ -343,7 +376,7 @@ void SendFrameToUnity(sFrameOfMocapData *data, void *pUserData)
 
         // stream xml data over UDP via SlipStream ==--
 
-        gSlipStream.Stream((unsigned char *) buffer,strlen(buffer));
+        gSlipStream.Stream( (unsigned char *) buffer, (int) strlen(buffer) );
     } 
 }
 

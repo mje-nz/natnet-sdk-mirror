@@ -81,6 +81,7 @@ typedef struct
 bool IPAddress_StringToAddr(char *szNameOrAddress, struct in_addr *Address);
 void Unpack(char* pData);
 int GetLocalIPAddresses(unsigned long Addresses[], int nMax);
+int SendCommand(char* szCOmmand);
 
 #define MULTICAST_ADDRESS		"239.255.42.99"     // IANA, local network
 #define PORT_COMMAND            1510
@@ -93,6 +94,11 @@ sockaddr_in HostAddr;
 
 int NatNetVersion[4] = {0,0,0,0};
 int ServerVersion[4] = {0,0,0,0};
+
+int gCommandResponse = 0;
+int gCommandResponseSize = 0;
+unsigned char gCommandResponseString[MAX_PATH];
+int gCommandResponseCode = 0;
 
 // command response listener thread
 DWORD WINAPI CommandListenThread(void* dummy)
@@ -137,13 +143,20 @@ DWORD WINAPI CommandListenThread(void* dummy)
             }
             break;
         case NAT_RESPONSE:
+            gCommandResponseSize = PacketIn.nDataBytes;
+            if(gCommandResponseSize==4)
+                memcpy(&gCommandResponse, &PacketIn.Data.lData[0], gCommandResponseSize);
+            else
             {
-                char* szResponse = (char *)PacketIn.Data.cData;
-                printf("Response : %s",szResponse);
-                break;
+                memcpy(&gCommandResponseString[0], &PacketIn.Data.cData[0], gCommandResponseSize);
+                printf("Response : %s", gCommandResponseString);
+                gCommandResponse = 0;   // ok
             }
+            break;
         case NAT_UNRECOGNIZED_REQUEST:
             printf("[Client] received 'unrecognized request'\n");
+            gCommandResponseSize = 0;
+            gCommandResponse = 1;       // err
             break;
         case NAT_MESSAGESTRING:
             printf("[Client] Received message: %s\n", PacketIn.Data.szData);
@@ -414,6 +427,30 @@ int main(int argc, char* argv[])
                     break;
             }
             break;
+        case 'w':
+            {
+                char szCommand[512];
+                long testVal;
+                int returnCode;
+                
+                testVal = -50;
+                sprintf(szCommand, "SetPlaybackStartFrame,%d",testVal);
+                returnCode = SendCommand(szCommand);
+
+                testVal = 1500;
+                sprintf(szCommand, "SetPlaybackStopFrame,%d",testVal);
+                returnCode = SendCommand(szCommand);
+
+                testVal = 0;
+                sprintf(szCommand, "SetPlaybackLooping,%d",testVal);
+                returnCode = SendCommand(szCommand);
+                
+                testVal = 100;
+                sprintf(szCommand, "SetPlaybackCurrentFrame,%d",testVal);
+                returnCode = SendCommand(szCommand);
+
+            }
+            break;
         case 'q':
             bExit = true;		
             break;	
@@ -425,8 +462,52 @@ int main(int argc, char* argv[])
     return 0;
 }
 
+// Send a command to Motive.  
+int SendCommand(char* szCommand)
+{
+    // reset global result
+    gCommandResponse = -1;
 
-// convert ipp address string to addr
+    // format command packet
+    sPacket commandPacket;
+    strcpy(commandPacket.Data.szData, szCommand);
+    commandPacket.iMessage = NAT_REQUEST;
+    commandPacket.nDataBytes = (int)strlen(commandPacket.Data.szData) + 1;
+
+    // send command, and wait (a bit) for command response to set global response var in CommandListenThread
+    int iRet = sendto(CommandSocket, (char *)&commandPacket, 4 + commandPacket.nDataBytes, 0, (sockaddr *)&HostAddr, sizeof(HostAddr));
+    if(iRet == SOCKET_ERROR)
+    {
+        printf("Socket error sending command");
+    }
+    else
+    {
+        int waitTries = 5;
+        while (waitTries--)
+        {
+            if(gCommandResponse != -1)
+                break;
+            Sleep(30);
+        }
+
+        if(gCommandResponse == -1)
+        {
+            printf("Command response not received (timeout)");
+        }
+        else if(gCommandResponse == 0)
+        {
+            printf("Command response received with success");
+        }
+        else if(gCommandResponse > 0)
+        {
+            printf("Command response received with errors");
+        }
+    }
+
+    return gCommandResponse;
+}
+
+// convert ip address string to addr
 bool IPAddress_StringToAddr(char *szNameOrAddress, struct in_addr *Address)
 {
 	int retVal;
