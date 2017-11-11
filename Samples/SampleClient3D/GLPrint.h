@@ -6,8 +6,8 @@
 class GLPrint
 {
 public:
-  GLPrint();
-  ~GLPrint();
+  GLPrint() {};
+  ~GLPrint()  {};
 
   void SetDeviceContext(HDC hdc);
   void Print(double x, double y, const char *format, ...);

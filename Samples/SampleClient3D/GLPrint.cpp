@@ -7,14 +7,9 @@
 
 #include "GLPrint.h"
 
-GLPrint::GLPrint()
-{
-  ;
-}
 
 void GLPrint::SetDeviceContext(HDC hDC)
 {
-  
     HFONT	glFont;										
     HFONT	oldfont;
     LOGFONT logicalFont;
@@ -23,11 +18,11 @@ void GLPrint::SetDeviceContext(HDC hDC)
     int numAsciiChars = 96;
     m_base = glGenLists(numAsciiChars);
 
-    logicalFont.lfHeight          = -18;     
+    logicalFont.lfHeight          = -16;     
     logicalFont.lfWidth           = 0; 
     logicalFont.lfEscapement      = 0; 
     logicalFont.lfOrientation     = 0; 
-    logicalFont.lfWeight          = FW_MEDIUM; //FW_NORMAL; 
+    logicalFont.lfWeight          = FW_BLACK; //FW_NORMAL; 
     logicalFont.lfItalic          = FALSE; 
     logicalFont.lfUnderline       = FALSE; 
     logicalFont.lfStrikeOut       = FALSE; 
@@ -41,10 +36,11 @@ void GLPrint::SetDeviceContext(HDC hDC)
     glFont = CreateFontIndirect( &logicalFont );
     oldfont = (HFONT)SelectObject(hDC, glFont);           
 
-    /* wgl bitmap fonts
+    /*
+    wgl bitmap fonts
     - pre-rendered into display list
     - no rotation
-    - scale indepenent
+    - scale independent
     */
     BOOL bSuccess = wglUseFontBitmaps(hDC, 32, numAsciiChars, m_base);
 
@@ -75,6 +71,3 @@ void GLPrint::Print(double x, double y, const char *format, ...)
   glPopMatrix();
 }
 
-GLPrint::~GLPrint(void)
-{
-}

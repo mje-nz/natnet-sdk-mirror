@@ -394,7 +394,7 @@ void __cdecl DataHandler(sFrameOfMocapData* data, void* pUserData)
 				rbData.ID, rbData.x, rbData.y, rbData.z, rbData.qx, rbData.qy, rbData.qz, rbData.qw );
 
 			printf("\tRigid body markers [Count=%d]\n", rbData.nMarkers);
-			for(int iMarker=0; iMarker < data->RigidBodies[i].nMarkers; iMarker++)
+			for(int iMarker=0; iMarker < rbData.nMarkers; iMarker++)
 			{
 				printf("\t\t");
 				if(rbData.MarkerIDs)

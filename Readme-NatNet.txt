@@ -9,8 +9,37 @@ Please refer to the NatNet API USer's Guide for more information.
 
 Change Log
 -----------
+Version 2.7.0 (10/15/2014)
+-----------------------
+Added:   Motive 1.7 Streaming support
 
-Version 2.6.0 (4/2014)
+Added:   New timing sample for validating mocap streaming frame timing.
+
+Added:   New Broadcast Trigger sample illustrating how to use remote record
+         trigger/listen using XML formatted UDP broadcast packets instead of NatNet commands.
+
+Added:   NatNetML - added SMPTE Timecode and Timecode Subframe members.  See WinForms sample for usage.
+
+Fixed:   Fix for FrameID periodically displays dropped/duplicate packets during live mode.
+
+Fixed:   Fix for PacketClient incorrectly decoding rigid Body IsTracked parameter.
+
+Fixed:   Fix for crash in GetDataDescriptions() when streaming a Rigid Body with a single character name.
+
+Fixed:   Sample Clint incorrectly reports skeleton marker data
+
+Changed: Update SampleClient3D to clarify quaterion decomposition, add new visuals.
+
+Changed: Maximum markers per rigid body changed from 10 to 20 to match new RigidBody tracking
+         capabilities in Motive.
+
+Changed: Frame timestamp now keyed off hardware frame id.  fTimestamp resolution increased
+         from float to double *.  
+         
+         * DirectDepackatization clients should update their code (see timestamp in PacketClient.cpp for an example).
+
+         
+Version 2.6.0 (5/8/2014)
 ------------------------------
 Added:   Motive 1.6 Streaming support
 
@@ -25,7 +54,7 @@ Added:   Additional flags on LabelMarkerList indicating marker occlusion and mar
 
 Added:   Additional FrameOfMocapData timestamp
 
-Added:   NatCap remote capture sample for illustring send/receive remote Motive control commands via
+Added:   NatCap remote capture sample for illustrating send/receive remote Motive control commands via
          UDP broadcast direct.
 
 Added:   UDP Repeater / Unity3D

@@ -5,6 +5,26 @@ This repository contains each version of NaturalPoint's [NatNet SDK](http://opti
 
 ## Changelog
 
+__2.7__ _(October 21, 2014)_
+
+Features & Enhancements
+
+* Motive 1.7 Streaming support
+* New timing sample for validating mocap streaming frame timing.
+* New Broadcast Trigger sample illustrating how to use remote record trigger/listen using XML formatted UDP broadcast packets instead of NatNet commands.
+* NatNetML - added SMPTE Timecode and Timecode Subframe members. See WinForms sample for usage.
+
+Fixes
+
+* Fix for FrameID periodically displays dropped/duplicate packets during live mode.
+* Fix for PacketClient incorrectly decoding rigid Body IsTracked parameter.
+* Fix for crash in GetDataDescriptions() when streaming a Rigid Body with a single character name.
+* Sample Clint incorrectly reports skeleton marker data
+* Update SampleClient3D to clarify quaterion decomposition, add new visuals.
+* Maximum markers per rigid body changed from 10 to 20 to match new RigidBody tracking capabilities in Motive.
+* Frame timestamp now keyed off hardware frame id. fTimestamp resolution increased from float to double (DirectDepackatization clients should update their code (see timestamp in PacketClient.cpp for an example).
+
+
 __2.6__ _(May 8, 2014)_
 
 

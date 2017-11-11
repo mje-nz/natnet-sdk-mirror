@@ -22,11 +22,8 @@ using System.Drawing;
 using System.Text;
 using System.Windows.Forms;
 using System.Net;
-
 using System.Threading;
-
 using System.Runtime.InteropServices;
-
 
 using NatNetML;
 
@@ -34,7 +31,7 @@ using NatNetML;
  *
  * Simple C# .NET sample showing how to use the NatNet managed assembly (NatNETML.dll).
  * 
- * It is designed to illustrate using NatNet.  There are some inefficiences to keep the
+ * It is designed to illustrate using NatNet.  There are some inefficiencies to keep the
  * code as simple to read as possible.
  * 
  * Sections marked with a [NatNet] are NatNet related and should be implemented in your code.
@@ -53,37 +50,39 @@ namespace WinFormTestApp
     {
         // [NatNet] Our NatNet object
         private NatNetML.NatNetClientML m_NatNet;
+        
         // [NatNet] Our NatNet Frame of Data object
         private NatNetML.FrameOfMocapData m_FrameOfData = new NatNetML.FrameOfMocapData();
     
+        // [NatNet] Description of the Active Model List from the server (e.g. Motive)
         NatNetML.ServerDescription desc = new NatNetML.ServerDescription();
 
+        // [NatNet] Queue holding our incoming mocap frames the NatNet server (e.g. Motive)
+        private Queue<NatNetML.FrameOfMocapData> m_FrameQueue = new Queue<NatNetML.FrameOfMocapData>();
+        
+        // spreadsheet lookup
         Hashtable htMarkers = new Hashtable();
         Hashtable htRigidBodies = new Hashtable();
-
         List<RigidBody> mRigidBodies = new List<RigidBody>();
 
+        // graphing support
         const int GraphFrames = 500;
-
         long m_FrameCounter = 0;
         int m_iLastFrameNumber = 0;
-        int m_iLastActualFrameNumber = 0;
-        float m_fLastFrameTimestamp = 0.0f;
-        float m_ServerToMillimeters = 1.0f;
-        double m_ServerFramerate = 1.0f;
+
+        // frame timing information
+        double m_fLastFrameTimestamp = 0.0f;
         float m_fCurrentMocapFrameTimestamp = 0.0f;
 		float m_fFirstMocapFrameTimestamp = 0.0f;
-
-        float m_fLastLatency = 0.0f;
-
         HiResTimer timer;
         Int64 lastTime = 0;
 
+        // server information
+        double m_ServerFramerate = 1.0f;
+        float m_ServerToMillimeters = 1.0f;
+        
         private static object syncLock = new object(); 
-
         private delegate void OutputMessageCallback(string strMessage);
-        private Queue<NatNetML.FrameOfMocapData> m_FrameQueue = new Queue<NatNetML.FrameOfMocapData>();
-
         private bool needMarkerListUpdate = false;
 
         public Form1()
@@ -115,15 +114,22 @@ namespace WinFormTestApp
             chart1.Series[0].Points.Clear();
             chart1.ChartAreas[0].CursorX.IsUserSelectionEnabled = true;
 
-
         }
 
+        /// <summary>
+        /// Create a new NatNet client, which manages all communication with the NatNet server (e.g. Motive)
+        /// </summary>
+        /// <param name="iConnectionType">0 = Multicast, 1 = Unicast</param>
+        /// <returns></returns>
         private int CreateClient(int iConnectionType)
         {
+            // release any previous instance
             if(m_NatNet != null)
             {
                 m_NatNet.Uninitialize();
             }
+
+            // [NatNet] create a new NatNet instance
             m_NatNet = new NatNetML.NatNetClientML(iConnectionType);
 
             // [NatNet] set a "Frame Ready" callback function (event handler) handler that will be
@@ -145,6 +151,9 @@ namespace WinFormTestApp
             
         }
 
+        /// <summary>
+        /// Connect to a NatNet server (e.g. Motive)
+        /// </summary>
         private void Connect()
         {
             // [NatNet] connect to a NatNet server
@@ -170,24 +179,15 @@ namespace WinFormTestApp
                 OutputMessage(String.Format("   Server NatNet Version: {0}.{1}.{2}.{3}", desc.NatNetVersion[0], desc.NatNetVersion[1], desc.NatNetVersion[2], desc.NatNetVersion[3]));
                 checkBoxConnect.Text = "Disconnect";
 
-                if (desc.HostApp.Contains("TrackingTools"))
+                // Tracking Tools and Motive report in meters - lets convert to millimeters
+                if (desc.HostApp.Contains("TrackingTools") || desc.HostApp.Contains("Motive"))
                     m_ServerToMillimeters = 1000.0f;
 
-                // [NatNet] [optional] send a test/response message
-                OutputMessage("Sending TestRequest");
+
+                // [NatNet] [optional] Query mocap server for the current camera framerate
                 int nBytes = 0;
                 byte[] response = new byte[10000];
-                int rc = m_NatNet.SendMessageAndWait("TestRequest", out response, out nBytes);
-                if (rc == 0)
-                {
-                    string str = "   Server: " + System.Text.Encoding.ASCII.GetString(response, 0, nBytes);
-                    OutputMessage(str);
-                }
-                else
-                {
-                    OutputMessage("   Server: No Response.");
-                }
-
+                int rc;
                 rc = m_NatNet.SendMessageAndWait("FrameRate", out response, out nBytes);
                 if (rc == 0)
                 {
@@ -204,8 +204,6 @@ namespace WinFormTestApp
 
                 m_fCurrentMocapFrameTimestamp = 0.0f;
                 m_fFirstMocapFrameTimestamp = 0.0f;
-
-               
             }
             else
             {
@@ -265,7 +263,11 @@ namespace WinFormTestApp
             return null;
         }
 
-        // Redraw the chart with data from the selected cell
+        
+        /// <summary>
+        /// Redraw the graph using the data of the selected cell in the spreadsheet
+        /// </summary>
+        /// <param name="iFrame">Frame ID of mocap data</param>
         private void UpdateChart(long iFrame)
         {
             // Lets only show 500 frames at a time
@@ -296,7 +298,11 @@ namespace WinFormTestApp
             m_iLastFrameNumber = (int)iFrame;
         }
 
-
+        /// <summary>
+        /// Update the spreadsheet.  
+        /// Note: This refresh is quite slow and provided here only as a complete example. 
+        /// In a production setting this would be optimized.
+        /// </summary>
         private void UpdateDataGrid()
         {
             // update MarkerSet data
@@ -367,8 +373,8 @@ namespace WinFormTestApp
                         double y = RadiansToDegrees(eulers[1]);
                         double z = RadiansToDegrees(eulers[2]);
 
-                        dataGridView1.Rows[rowIndex].Cells[4].Value = y;
-                        dataGridView1.Rows[rowIndex].Cells[5].Value = x;
+                        dataGridView1.Rows[rowIndex].Cells[4].Value = x;
+                        dataGridView1.Rows[rowIndex].Cells[5].Value = y;
                         dataGridView1.Rows[rowIndex].Cells[6].Value = z;
                               
                         // update Marker data associated with this rigid body
@@ -391,9 +397,7 @@ namespace WinFormTestApp
                                     }
                                 }
                             }
-
                         }
-
                     }
                 }   
             }
@@ -429,22 +433,9 @@ namespace WinFormTestApp
                             double y = RadiansToDegrees(eulers[1]);
                             double z = RadiansToDegrees(eulers[2]);
 
-                            /*
-                            if (desc.HostApp.Contains("TrackingTools") || desc.HostApp.Contains("Motive"))
-                            {
-
-                            }
-                            else
-                            {
-                                // Arena is LHS
-                                y *= -1.0f;
-                                z *= -1.0f;
-                            }
-                            */
-
-                            dataGridView1.Rows[rowIndex].Cells[4].Value = y;
-                            dataGridView1.Rows[rowIndex].Cells[5].Value = z;
-                            dataGridView1.Rows[rowIndex].Cells[6].Value = x;
+                            dataGridView1.Rows[rowIndex].Cells[4].Value = x;
+                            dataGridView1.Rows[rowIndex].Cells[5].Value = y;
+                            dataGridView1.Rows[rowIndex].Cells[6].Value = z;
 
                             // Marker data associated with this rigid body
                             for (int k = 0; k < rb.nMarkers; k++)
@@ -478,7 +469,11 @@ namespace WinFormTestApp
 
         }
 
-        // [NatNet] request data descriptions from server app.  
+        /// <summary>
+        /// [NatNet] Request a description of the Active Model List from the server (e.g. Motive) and build up a new spreadsheet  
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
         private void buttonGetDataDescriptions_Click(object sender, EventArgs e)
         {
             mRigidBodies.Clear();
@@ -578,20 +573,25 @@ namespace WinFormTestApp
             }
         }
 
-        // [NatNet] m_NatNet_OnFrameReady will be called when a frame of Mocap
-        // data has is received from the server application.
-        //
-        // Note: This callback is on the network service thread, so it is
-        // important  to return from this function quickly as possible 
-        // to prevent incoming frames of data from buffering up on the
-        // network socket.
-        //
-        // Note: "data" is a reference structure to the current frame of data.
-        // NatNet re-uses this same instance for each incoming frame, so it should
-        // not be kept (the values contained in "data" will become replaced after
-        // this callback function has exited).
+        /// <summary>
+        /// [NatNet] m_NatNet_OnFrameReady will be called when a frame of Mocap
+        /// data has is received from the server application.
+        ///
+        /// Note: This callback is on the network service thread, so it is
+        /// important to return from this function quickly as possible 
+        /// to prevent incoming frames of data from buffering up on the
+        /// network socket.
+        ///
+        /// Note: "data" is a reference structure to the current frame of data.
+        /// NatNet re-uses this same instance for each incoming frame, so it should
+        /// not be kept (the values contained in "data" will become replaced after
+        /// this callback function has exited).
+        /// </summary>
+        /// <param name="data">The actual frame of mocap data</param>
+        /// <param name="client">The NatNet client instance</param>
         void m_NatNet_OnFrameReady(NatNetML.FrameOfMocapData data, NatNetML.NatNetClientML client)
         {
+            // [optional] High-resolution frame arrival timing information
             Int64 currTime = timer.Value;
             if(lastTime !=0)
             {
@@ -601,36 +601,35 @@ namespace WinFormTestApp
                 // uncomment for timing info
                 //OutputMessage("Frame Delivered: (" + timeElapseInTenthsOfMilliseconds.ToString() + ")  FrameTimestamp: " + data.fLatency);
             }
-            lock(syncLock)
+
+            // [NatNet] Add the incoming frame of mocap data to our frame queue,  
+            // Note: the frame queue is a shared resource with the UI thread, so lock it while writing
+             lock(syncLock)
             {
+                // [optional] clear the frame queue before adding a new frame
                 m_FrameQueue.Clear();
                 m_FrameQueue.Enqueue(data);
             }
             lastTime = currTime;
         }
 
-        // [NatNet] m_NatNet_OnFrameReady2 will be called when a frame of Mocap
-        // data has is received from the server application.
+        // [NatNet] [optional] alternate function signatured frame ready callback handler for .NET applications/hosts
+        // that don't support the m_NatNet_OnFrameReady defiend above (e.g. MATLAB)
         void m_NatNet_OnFrameReady2(object sender, NatNetEventArgs e)
         {
             m_NatNet_OnFrameReady(e.data, e.client);
         }
 
-        double RadiansToDegrees(double dRads)
-        {
-            return dRads * (180.0f / Math.PI);
-        }
 
-
-        private void Form1_FormClosing(object sender, FormClosingEventArgs e)
-        {
-            m_NatNet.Uninitialize();
-        }
-
-        // UI refresher
+        /// <summary>
+        /// Refresh the UI at a fixed period specifid by the timer
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
         private void UpdateUITimer_Tick(object sender, EventArgs e)
         {
-
+            // the frame queue is a shared resource with the FrameOfMocap delivery thread, so lock it while reading
+            // note this can block the frame delivery thread.  In a production application frame queue management would be optimized.
             lock (syncLock)
             {
                 while (m_FrameQueue.Count > 0)
@@ -674,19 +673,33 @@ namespace WinFormTestApp
                             chart1.Invalidate();
                         }
                         
-                        m_fLastFrameTimestamp = m_FrameOfData.fLatency;
+                        // Mocap server timestamp (in seconds)
+                        m_fLastFrameTimestamp = m_FrameOfData.fTimestamp;
+                        TimestampValue.Text = m_FrameOfData.fTimestamp.ToString("F3");
 
-                        TimestampLabel.Text = m_FrameOfData.fLatency.ToString();
+                        // SMPTE timecode (if timecode generator present)
+                        int hour, minute, second, frame, subframe;
+                        bool bSuccess = m_NatNet.DecodeTimecode(m_FrameOfData.Timecode, m_FrameOfData.TimecodeSubframe, out hour, out minute, out second, out frame, out subframe);
+                        if(bSuccess)
+                            TimecodeValue.Text = string.Format("{0:D2}:{1:D2}:{2:D2}:{3:D2}.{4:D2}",hour, minute, second, frame, subframe);
 
                         if (m_FrameOfData.bRecording)
                             chart1.BackColor = Color.Red;
                         else
                             chart1.BackColor = Color.White;
-
                     }
-
                 }
             }
+        }
+
+        double RadiansToDegrees(double dRads)
+        {
+            return dRads * (180.0f / Math.PI);
+        }
+
+        private void Form1_FormClosing(object sender, FormClosingEventArgs e)
+        {
+            m_NatNet.Uninitialize();
         }
 
         private void RadioMulticast_CheckedChanged(object sender, EventArgs e)
@@ -714,7 +727,6 @@ namespace WinFormTestApp
         {
             return ((number >> 16) & 0xFFFF); 
         }
-
 
         private void RecordButton_Click(object sender, EventArgs e)
         {
@@ -782,6 +794,9 @@ namespace WinFormTestApp
         }
     }
 
+    /// <summary>
+    /// [Optional] HiResTimer is a high-resolution timer utility for measuring mocap frame arrival times.
+    /// </summary>
     public class HiResTimer
     {
         private bool isPerfCounterSupported = false;

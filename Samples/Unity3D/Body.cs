@@ -61,6 +61,7 @@ public class Body : MonoBehaviour {
 			
 			z = -z;
 			qz = -qz;
+			qw = -qw;
 			
 			//== bone pose ==--
 			

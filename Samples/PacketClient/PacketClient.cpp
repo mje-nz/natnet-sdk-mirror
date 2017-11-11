@@ -84,7 +84,7 @@ int GetLocalIPAddresses(unsigned long Addresses[], int nMax);
 
 #define MULTICAST_ADDRESS		"239.255.42.99"     // IANA, local network
 #define PORT_COMMAND            1510
-#define PORT_DATA  			    1511                // Default multicast group
+#define PORT_DATA  			    1511                
 
 SOCKET CommandSocket;
 SOCKET DataSocket;
@@ -413,7 +413,7 @@ int main(int argc, char* argv[])
                 if(iRet != SOCKET_ERROR)
                     break;
             }
-            break;	
+            break;
         case 'q':
             bExit = true;		
             break;	
@@ -618,14 +618,6 @@ void Unpack(char* pData)
                 memcpy(markerSizes, ptr, nBytes);
                 ptr += nBytes;
 
-                // 2.6 and later
-                if( ((major == 2)&&(minor >= 6)) || (major > 2) || (major == 0) ) 
-                {
-                    // params
-                    short params = 0; memcpy(&params, ptr, 2); ptr += 2;
-                    bool bTrackingValid = params & 0x01; // 0x01 : rigid body was successfully tracked in this frame
-                }
-
                 for(int k=0; k < nRigidMarkers; k++)
                 {
                     printf("\tMarker %d: id=%d\tsize=%3.1f\tpos=[%3.2f,%3.2f,%3.2f]\n", k, markerIDs[k], markerSizes[k], markerData[k*3], markerData[k*3+1],markerData[k*3+2]);
@@ -654,8 +646,15 @@ void Unpack(char* pData)
                 printf("Mean marker error: %3.2f\n", fError);
             }
 
+            // 2.6 and later
+            if( ((major == 2)&&(minor >= 6)) || (major > 2) || (major == 0) ) 
+            {
+                // params
+                short params = 0; memcpy(&params, ptr, 2); ptr += 2;
+                bool bTrackingValid = params & 0x01; // 0x01 : rigid body was successfully tracked in this frame
+            }
             
-	    } // next rigid body
+        } // next rigid body
 
 
         // skeletons (version 2.1 and later)
@@ -776,7 +775,18 @@ void Unpack(char* pData)
 		TimecodeStringify(timecode, timecodeSub, szTimecode, 128);
 
         // timestamp
-        float timestamp = 0.0f;  memcpy(&timestamp, ptr, 4); ptr += 4;
+        double timestamp = 0.0f;
+        // 2.7 and later - increased from single to double precision
+        if( ((major == 2)&&(minor>=7)) || (major>2))
+        {
+            memcpy(&timestamp, ptr, 8); ptr += 8;
+        }
+        else
+        {
+            float fTemp = 0.0f;
+            memcpy(&fTemp, ptr, 4); ptr += 4;
+            timestamp = (double)fTemp;
+        }
 
         // frame params
         short params = 0;  memcpy(&params, ptr, 2); ptr += 2;

@@ -34,6 +34,9 @@ public:
   static void DrawBox(GLfloat x, GLfloat y, GLfloat z, GLfloat qx, GLfloat qy, GLfloat qz, GLfloat qw);
 
   static void DrawGrid();
+
+  static void DrawCube(float scale);
+
 };
 
 #endif // _OPEN_GL_DRAWING_FUNCTIONS_H_

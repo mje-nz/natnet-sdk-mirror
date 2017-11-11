@@ -30,8 +30,9 @@ function NatNetMatlabSample()
         % Note : The NatNetML.DLL assembly depends on NatNet.dll, so make sure they
         % are both in the same folder and/or path if you move them.
         display('[NatNet] Creating Client.')
-        % TODO : update the path to your NatNetML.DLL file here
-        dllPath = fullfile('c:','NatNetSDK2.5','lib','x64','NatNetML.dll');
+		curDir = pwd;
+		mainDir = fileparts(fileparts(curDir));
+		dllPath = fullfile(mainDir,'lib','x64','NatNetML.dll');
         assemblyInfo = NET.addAssembly(dllPath);
 
         % Create an instance of a NatNet client

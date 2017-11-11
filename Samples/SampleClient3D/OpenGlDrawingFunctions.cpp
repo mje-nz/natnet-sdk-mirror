@@ -135,6 +135,65 @@ void OpenGLDrawingFunctions::DrawBox(GLfloat x, GLfloat y, GLfloat z, GLfloat qx
   glEnd();
 }
 
+void OpenGLDrawingFunctions::DrawCube(float scale)
+{
+    const float sizex = 0.5f * scale;
+    const float sizey = 0.5f * scale;
+    const float sizez = 0.5f * scale;
+
+    glBegin(GL_QUADS);
+
+    // FRONT
+    glColor3f(0.0f, 0.0f, 1.0f);
+    glNormal3f(0.0f, 0.0f, 1.0f);
+    glVertex3f(-sizex, -sizey, sizez);
+    glVertex3f(sizex, -sizey, sizez);
+    glVertex3f(sizex, sizey, sizez);
+    glVertex3f(-sizex, sizey, sizez);
+
+    // BACK
+    glNormal3f(0.0f ,0.0f, 1.0f);
+    glVertex3f(-sizex, -sizey, -sizez);
+    glVertex3f(-sizex, sizey, -sizez);
+    glVertex3f(sizex, sizey, -sizez);
+    glVertex3f(sizex, -sizey, -sizez);
+
+
+    // LEFT
+    glColor3f(1.0f, 0.0f, 0.0f);
+    glNormal3f(1.0f, 0.0f, 0.0f);
+    glVertex3f(-sizex, -sizey, sizez);
+    glVertex3f(-sizex, sizey, sizez);
+    glVertex3f(-sizex, sizey, -sizez);
+    glVertex3f(-sizex, -sizey, -sizez);
+
+    // RIGHT
+    glNormal3f(1.0f, 0.0f, 0.0f);
+    glVertex3f(sizex, -sizey, -sizez);
+    glVertex3f(sizex, sizey, -sizez);
+    glVertex3f(sizex, sizey, sizez);
+    glVertex3f(sizex, -sizey, sizez);
+
+
+    // TOP
+    glColor3f(0.0f, 1.0f, 0.0f);
+    glNormal3f(0.0f, 1.0f, 0.0f);
+    glVertex3f(-sizex, sizey, sizez);
+    glVertex3f(sizex, sizey, sizez);
+    glVertex3f(sizex, sizey, -sizez);
+    glVertex3f(-sizex, sizey, -sizez);
+
+    // BOTTOM
+    glNormal3f(0.0f, 1.0f, 0.0f);
+    glVertex3f(-sizex, -sizey, sizez);
+    glVertex3f(-sizex, -sizey, -sizez);
+    glVertex3f(sizex, -sizey, -sizez);
+    glVertex3f(sizex, -sizey, sizez);
+
+    glEnd();
+
+}
+
 void OpenGLDrawingFunctions::DrawGrid()
 {
   glPushAttrib(GL_ALL_ATTRIB_BITS);
@@ -155,7 +214,7 @@ void OpenGLDrawingFunctions::DrawGrid()
   glEnable(GL_COLOR_MATERIAL);
 
   float r,g,b,a;
-  r = g = b = a = 1.0f;
+  r = g = b = a = 0.7f;
 
   for(float x=-halfSize; x<=halfSize; x+=step)
   {

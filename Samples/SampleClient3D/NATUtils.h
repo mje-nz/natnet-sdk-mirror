@@ -145,18 +145,18 @@ public:
 template<typename T>
 void NATUtils::QaternionToRotationMatrix(T *q, T *m)
 {
-  m[0] = 1-2*q[Y]*q[Y]-2*q[Z]*q[Z]; m[1] = 2*q[X]*q[Y]-2*q[W]*q[Z];   m[2] = 2*q[X]*q[Z]+2*q[W]*q[Y];
-  m[3] = 2*q[X]*q[Y]+2*q[W]*q[Z];   m[4] = 1-2*q[X]*q[X]-2*q[Z]*q[Z]; m[5] = 2*q[Y]*q[Z]-2*q[W]*q[X];
-  m[6] = 2*q[X]*q[Z]-2*q[W]*q[Y];   m[7] = 2*q[Y]*q[Z]+2*q[W]*q[X];   m[8] = 1-2*q[X]*q[X]-2*q[Y]*q[Y];
+  m[0] = 1-2*q[Y]*q[Y]-2*q[Z]*q[Z]; m[3] = 2*q[X]*q[Y]-2*q[W]*q[Z];   m[6] = 2*q[X]*q[Z]+2*q[W]*q[Y];
+  m[1] = 2*q[X]*q[Y]+2*q[W]*q[Z];   m[4] = 1-2*q[X]*q[X]-2*q[Z]*q[Z]; m[7] = 2*q[Y]*q[Z]-2*q[W]*q[X];
+  m[2] = 2*q[X]*q[Z]-2*q[W]*q[Y];   m[5] = 2*q[Y]*q[Z]+2*q[W]*q[X];   m[8] = 1-2*q[X]*q[X]-2*q[Y]*q[Y];
 }
 
 
 template<typename T>
 void NATUtils::Vec3MatrixMult(T *v, T *m)
 {
-  float x = v[0]*m[0]+v[1]*m[3]+v[2]*m[6];
-  float y = v[0]*m[1]+v[1]*m[4]+v[2]*m[7];
-  float z = v[0]*m[2]+v[1]*m[5]+v[2]*m[8];
+  T x = v[0]*m[0]+v[1]*m[3]+v[2]*m[6];
+  T y = v[0]*m[1]+v[1]*m[4]+v[2]*m[7];
+  T z = v[0]*m[2]+v[1]*m[5]+v[2]*m[8];
   v[0] = x;
   v[1] = y;
   v[2] = z;

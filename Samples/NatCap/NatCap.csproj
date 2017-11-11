@@ -67,10 +67,6 @@
       <DependentUpon>MainWindow.xaml</DependentUpon>
       <SubType>Code</SubType>
     </Compile>
-    <Page Include="Styles\ExpressionDark.xaml">
-      <Generator>MSBuild:Compile</Generator>
-      <SubType>Designer</SubType>
-    </Page>
     <Page Include="Styles\MetroDark.MSControls.Core.Implicit.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>

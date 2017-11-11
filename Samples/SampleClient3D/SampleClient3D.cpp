@@ -39,6 +39,11 @@
 #include "MarkerPositionCollection.h"
 #include "OpenGLDrawingFunctions.h"
 
+#include <map>
+#include <string>
+
+#define ID_RENDERTIMER 101
+
 // globals
 // Class for printing bitmap fonts in OpenGL
 GLPrint glPrinter;
@@ -57,8 +62,13 @@ NatNetClient natnetClient;
 MarkerPositionCollection markerPositions;
 RigidBodyCollection rigidBodies;
 
+std::map<int, std::string> mapIDToName;
+
 // Ready to render?
 bool render = true;
+
+// Show rigidbody info
+bool showText = true;
 
 // Used for converting NatNet data to the proper units.
 float unitConversion = 1.0f;
@@ -69,11 +79,19 @@ int IPAddress[4] = {127,0,0,1};
 // Timecode string 
 char szTimecode[128] = "";
 
+// Initial Eye position and rotation
+float g_fEyeX = 0, g_fEyeY = 1, g_fEyeZ = 5;
+float g_fRotY = 0;
+
 // functions
+// Win32
 BOOL InitInstance(HINSTANCE, int);
 LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);
 LRESULT CALLBACK NatNetDlgProc(HWND, UINT, WPARAM, LPARAM);
-void Render();
+// OpenGL
+void RenderOGLScene();
+void Update(HWND hWnd);
+// NatNet
 void DataHandler(sFrameOfMocapData* data, void* pUserData);			// receives data from the server
 void MessageHandler(int msgType, char* msg);		// receives NatNet error mesages
 bool InitNatNet(LPSTR szIPAddress, LPSTR szServerIPAddress);
@@ -89,17 +107,18 @@ ATOM MyRegisterClass(HINSTANCE hInstance)
 {
   WNDCLASSEX wcex;
   wcex.cbSize = sizeof(WNDCLASSEX); 
-  wcex.style			= CS_HREDRAW | CS_VREDRAW;
-  wcex.lpfnWndProc	= (WNDPROC)WndProc;
+  wcex.style			= CS_HREDRAW | CS_VREDRAW | CS_OWNDC;
+  wcex.lpfnWndProc	    = (WNDPROC)WndProc;
   wcex.cbClsExtra		= 0;
   wcex.cbWndExtra		= 0;
   wcex.hInstance		= hInstance;
   wcex.hIcon			= NULL;
-  wcex.hCursor		= LoadCursor(NULL, IDC_ARROW);
+  wcex.hCursor		    = LoadCursor(NULL, IDC_ARROW);
   wcex.hbrBackground	= (HBRUSH)(COLOR_WINDOW+1);
-  wcex.lpszMenuName	= MAKEINTRESOURCE(IDC_NATNETSAMPLE);
+  wcex.lpszMenuName	    = MAKEINTRESOURCE(IDC_NATNETSAMPLE);
   wcex.lpszClassName	= "NATNETSAMPLE";
-  wcex.hIconSm		= NULL;
+  wcex.hIconSm		    = NULL;
+
   return RegisterClassEx(&wcex);
 }
 
@@ -113,7 +132,6 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
     return false;
 
   MSG msg;
-
   while(true)
   {
     if(PeekMessage(&msg, NULL, 0, 0, PM_NOREMOVE))
@@ -126,17 +144,7 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
     else
     {
       if(render)
-      {
-        HDC hDC = GetDC(msg.hwnd);
-        if(hDC)
-        {
-          wglMakeCurrent(hDC, openGLRenderContext);
-          Render();
-          SwapBuffers(hDC);
-          wglMakeCurrent(0, 0);
-        }
-        ReleaseDC(msg.hwnd, hDC);
-      }
+          Update(msg.hwnd);
     }
   }
 
@@ -148,8 +156,8 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 {
   hInst = hInstance;
 
-  HWND hWnd = CreateWindow("NATNETSAMPLE", "NatNet Sample", WS_OVERLAPPEDWINDOW,
-  CW_USEDEFAULT, 0, CW_USEDEFAULT, 0, NULL, NULL, hInstance, NULL);
+  HWND hWnd = CreateWindow("NATNETSAMPLE", "SampleClient 3D", WS_OVERLAPPEDWINDOW,
+                            CW_USEDEFAULT, 0, CW_USEDEFAULT, 0, NULL, NULL, hInstance, NULL);
 
   if (!hWnd)
     return false;
@@ -184,7 +192,6 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
   // Set the device context for our OpenGL printer object.
   glPrinter.SetDeviceContext(hDC);
 
-
   wglMakeCurrent(0, 0);
   ReleaseDC(hWnd, hDC);
 
@@ -202,8 +209,12 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
     IPAddress[3] = MyAddress[0].S_un.S_un_b.s_b4;
   }
 
+  // schedule to render on UI thread every 30 milliseconds
+  UINT renderTimer = SetTimer(hWnd, ID_RENDERTIMER, 30, NULL);
+
   return true;
 }
+
 
 // Windows message processing function.
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
@@ -229,17 +240,55 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     default:
       return DefWindowProc(hWnd, message, wParam, lParam);
     }
-
     break;
+
+  case WM_TIMER:
+      if(wParam == ID_RENDERTIMER)
+          Update(hWnd);
+      break;
+
+  case WM_KEYDOWN:
+      {
+          bool bShift = ( GetKeyState(VK_SHIFT) & 0x80 ) != 0;
+          bool bCtrl = ( GetKeyState(VK_CONTROL) & 0x80 ) != 0;
+          switch( wParam )
+          {
+          case VK_UP:
+              if( bShift )
+                  g_fEyeY += 0.03f;
+              else
+                  g_fEyeZ -= 0.03f;
+              break;
+          case VK_DOWN:
+              if( bShift )
+                  g_fEyeY -= 0.03f;
+              else
+                  g_fEyeZ += 0.03f;
+              break;
+          case VK_LEFT:
+              if( bCtrl )
+                  g_fRotY += 1;
+              else
+                g_fEyeX -= 0.03f;
+              break;
+          case VK_RIGHT:
+              if( bCtrl )
+                  g_fRotY -= 1;
+              else
+                g_fEyeX += 0.03f;
+              break;
+          case 'T':
+          case 't':
+              showText = !showText;
+              break;
+          }
+          InvalidateRect(hWnd, NULL, TRUE);
+      }
+      break;
 
   case WM_PAINT:
     hdc = BeginPaint(hWnd, &ps);
-    // Render a frame NatNet data. This data has been saved off in NatNet callbacks 
-    // into the file level variables markerPositions and rigidBodies
-    wglMakeCurrent(hdc, openGLRenderContext);
-    Render();
-    SwapBuffers(hdc);
-    wglMakeCurrent(0, 0);
+    Update(hWnd);
     EndPaint(hWnd, &ps);
     break;
 
@@ -267,6 +316,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         glViewport(rv.left, rv.top, rv.right-rv.left, rv.bottom-rv.top);
         glMatrixMode(GL_MODELVIEW);
 
+        Update(hWnd);
+
         wglMakeCurrent(0, 0);
         ReleaseDC(hWnd, hDC);
       }
@@ -292,90 +343,131 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
   return 0;
 }
 
-// Main OpenGL rendering function. 
-void Render()
+// Update OGL window
+void Update(HWND hwnd)
+{
+  HDC hDC = GetDC(hwnd);
+  if(hDC)
+  {
+    wglMakeCurrent(hDC, openGLRenderContext);
+    RenderOGLScene();
+    SwapBuffers(hDC);
+    wglMakeCurrent(0, 0);
+  }
+  ReleaseDC(hwnd, hDC);
+}
+
+// Render OpenGL scene
+void RenderOGLScene()
 {
   GLfloat m[9];
   GLfloat v[3];
   float fRadius = 5.0f;
 
+  // Setup OpenGL viewport
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // Clear buffers
   glLoadIdentity(); // Load identity matrix
-
-  GLfloat glfLight[] = {-4.0f, 4.0f, 4.0f, 0.0f};
-  glLightfv(GL_LIGHT0, GL_POSITION, glfLight);
-
+  GLfloat glfLightPos[] = {-4.0f, 4.0f, 4.0f, 0.0f};
+  GLfloat glfLightAmb[] = {.3f, .3f, .3f, 1.0f};
+  glLightfv(GL_LIGHT0, GL_AMBIENT, glfLightAmb);
+  glLightfv(GL_LIGHT1, GL_POSITION, glfLightPos);
   glEnable(GL_COLOR_MATERIAL);
   glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE);
 
   glPushMatrix();
 
-  // draw timecode
+  // Draw timecode
+  glColor4f(1.0f,1.0f,1.0f,1.0f);
   glPushMatrix();
   glTranslatef(2400.f, -1750.f, -5000.0f);	
   glPrinter.Print(0.0f,0.0f,szTimecode);
   glPopMatrix();
 
   // Position and rotate the camera
-  glTranslatef(0.0f, -1000.0f, -5000.0f);	
+  glTranslatef(g_fEyeX * -1000, g_fEyeY * -1000, g_fEyeZ * -1000);	
+  glRotatef(g_fRotY, 0, 1, 0);
 
-  //draw axis
+  // Draw reference axis triad
+  // x
+  glLineWidth(3.0f);
   glBegin(GL_LINES);
-  glColor3f(1.0f, 0.0f, 0.0f);
+  glColor3f(.8f, 0.0f, 0.0f);
   glVertex3f(0,0,0);
   glVertex3f(300,0,0);
-
-  glColor3f(0.0f, 1.0f, 0.0f);
+  // y
+  glColor3f(0.0f, .8f, 0.0f);
   glVertex3f(0,0,0);
   glVertex3f(0,300,0);
-
-  glColor3f(0.0f, 0.0f, 1.0f);
+  // z
+  glColor3f(0.0f, 0.0f, .8f);
   glVertex3f(0,0,0);
   glVertex3f(0,0,300);
   glEnd();
 
-  // draw grid
+  // Draw grid
+  glLineWidth(1.0f);
   OpenGLDrawingFunctions::DrawGrid();
 
-  // Draw the rigid bodies
+  // Draw rigid bodies
+  float textX = -3200.0f;
+  float textY = 2700.0f;
+  GLfloat x, y, z;
+  Quat q;
+  EulerAngles ea;
+  int order;
   for (size_t i = 0; i < rigidBodies.Count(); i++)
   {
-    GLfloat x, y, z;
+    // RigidBody position
     std::tie(x, y, z) = rigidBodies.GetCoordinates(i);
-    x *= unitConversion;	// convert to mm
+    // convert to millimeters
+    x *= unitConversion;	
     y *= unitConversion;
     z *= unitConversion;
+  
+    // RigidBody orientation
     GLfloat qx, qy, qz, qw;
     std::tie(qx, qy, qz, qw) = rigidBodies.GetQuaternion(i);
-    glColor4f(0.0f,0.0f,1.0f,1.0f);
-    OpenGLDrawingFunctions::DrawBox(x,y,z,qx,qy,qz,qw);
-    glColor4f(0.0f,0.0f,0.0f,1.0f);
-
-    // Convert quaternion to eulers.  Motive coordinate conventions: X(Pitch), Y(Yaw), Z(Roll), Relative, RHS
-    Quat q;
+    
+    // Convert Motive quaternion output to euler angles
+    // Motive coordinate conventions : X(Pitch), Y(Yaw), Z(Roll), Relative, RHS
     q.x = qx; q.y = qy; q.z = qz; q.w = qw;
-    int order = EulOrdXYZr;
-    EulerAngles ea = Eul_FromQuat(q, order);
+    order = EulOrdXYZr;
+    ea = Eul_FromQuat(q, order);
     ea.x = NATUtils::RadiansToDegrees(ea.x);
     ea.y = NATUtils::RadiansToDegrees(ea.y);
     ea.z = NATUtils::RadiansToDegrees(ea.z);
-    glPrinter.Print(x,y,"RB %d (Pitch: %3.1f, Yaw: %3.1f, Roll: %3.1f)", rigidBodies.ID(i), ea.x, ea.y, ea.z);
+    
+    // Draw RigidBody as cube
+    glPushAttrib(GL_ALL_ATTRIB_BITS);
+    glPushMatrix();
+    glTranslatef(x, y, z);
+    glRotatef(ea.x, 1.0f, 0.0f, 0.0f);  
+    glRotatef(ea.y, 0.0f, 1.0f, 0.0f);
+    glRotatef(ea.z, 0.0f, 0.0f, 1.0f);
+    OpenGLDrawingFunctions::DrawCube(100.0f);
+    glPopMatrix();
+    glPopAttrib();
+
+    if(showText )
+    {
+        glColor4f(1.0f,1.0f,1.0f,1.0f);
+        std::string rigidBodyName = mapIDToName.at(rigidBodies.ID(i));
+        glPrinter.Print(textX, textY,"%s (Pitch: %3.1f, Yaw: %3.1f, Roll: %3.1f)", rigidBodyName.c_str(), ea.x, ea.y, ea.z);
+        textY -= 100.0f;
+    }
+
   }
 
-  // draw markers
-  // [optional] local coordinate support : get first rb's pos/ori (face support only- assume 1st is root)
-  if(rigidBodies.Count()==1)
-  {
-    GLfloat q[4];
-    std::tie(q[0], q[1], q[2], q[3]) = rigidBodies.GetQuaternion(0);
-    NATUtils::QaternionToRotationMatrix(q, m);
-  }
-
+  // Draw unlabeled markers (orange)
+  glPushAttrib(GL_ALL_ATTRIB_BITS);
+  glColor4f(0.8f, 0.4f, 0.0f, 0.8f);
+  fRadius = 20.0f;
   for (size_t i = 0; i < markerPositions.MarkerPositionCount(); i++)
   {
     std::tie(v[0], v[1], v[2]) = markerPositions.GetMarkerPosition(i);
 
-    // [optional] local coordinate support : inherit (accumulate) parent's RB pos/ori ("root") if using local marker position
+    // [optional] local coordinate support : inherit (accumulate) parent's RigidBody position & orientation ("root transform") if using local marker positions
+    // typically used with face capture setups
     if(rigidBodies.Count()==1)
     {
       NATUtils::Vec3MatrixMult(v,m);
@@ -383,13 +475,22 @@ void Render()
       v[1] += std::get<1>(rigidBodies.GetCoordinates(0));
       v[2] += std::get<2>(rigidBodies.GetCoordinates(0));
     }
+
+    // convert to millimeters
+    v[0] *= unitConversion;
+    v[1] *= unitConversion;
+    v[2] *= unitConversion;
+
     glPushMatrix();
-    glTranslatef(v[0] * unitConversion, v[1] * unitConversion, v[2] * unitConversion);
-    OpenGLDrawingFunctions::DrawSphere(1,fRadius);
+    glTranslatef(v[0], v[1], v[2]);
+    OpenGLDrawingFunctions::DrawSphere(1, fRadius);
     glPopMatrix();
   }
+  glPopAttrib();
 
-  //draw labeled markers
+  // Draw labeled markers (white)
+  glPushAttrib(GL_ALL_ATTRIB_BITS);
+  glColor4f(0.8f, 0.8f, 0.8f, 0.8f);
   for (size_t i = 0; i < markerPositions.LabeledMarkerPositionCount(); i++)
   {
     const sMarker& markerData = markerPositions.GetLabeledMarker(i);
@@ -397,19 +498,22 @@ void Render()
     v[1] = markerData.y * unitConversion;
     v[2] = markerData.z * unitConversion;
     fRadius = markerData.size * unitConversion;
+    
     glPushMatrix();
-    glTranslatef(v[0],v[1],v[2]);
-    glColor4f(1.0f,0.0f,0.0f,1.0f);
+    glTranslatef(v[0], v[1], v[2]);
     OpenGLDrawingFunctions::DrawSphere(1,fRadius);
     glPopMatrix();
+
   }
+  glPopAttrib();
 
   glPopMatrix();
-
   glFlush();
+
   // Done rendering a frame. The NatNet callback function DataHandler
   // will set render to true when it receives another frame of data.
   render = false; 
+
 }
 
 // Callback for the connect-to-NatNet dialog. Gets the server and local IP 
@@ -449,7 +553,7 @@ LRESULT CALLBACK NatNetDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lP
         GetDlgItemText(hDlg, IDC_EDIT8, ip4, 4);
         sprintf_s(szServerIPAddress, 30, "%s.%s.%s.%s", ip1,ip2,ip3,ip4);
 
-        // Try and intialize the NatNet client.
+        // Try and initialize the NatNet client.
         if (InitNatNet(szMyIPAddress, szServerIPAddress) == false)
         {
           natnetClient.Uninitialize();
@@ -522,27 +626,43 @@ bool InitNatNet(LPSTR szIPAddress, LPSTR szServerIPAddress)
 
 bool ParseRigidBodyDescription(sDataDescriptions* pDataDefs)
 {
+    mapIDToName.clear();
+
   if (pDataDefs == NULL || pDataDefs->nDataDescriptions <= 0)
     return false;
 
+  // preserve a "RigidBody ID to Rigid Body Name" mapping, which we can lookup during data streaming
+  int iSkel = 0;
   for (int i=0,j=0;i<pDataDefs->nDataDescriptions;i++)
   {
-    if (pDataDefs->arrDataDescriptions[i].type != Descriptor_RigidBody)
+    if (pDataDefs->arrDataDescriptions[i].type == Descriptor_RigidBody)
+    {
+        sRigidBodyDescription *pRB = pDataDefs->arrDataDescriptions[i].Data.RigidBodyDescription;
+        mapIDToName[pRB->ID] = std::string(pRB->szName);
+    }
+    else if(pDataDefs->arrDataDescriptions[i].type == Descriptor_Skeleton)
+    {
+        sSkeletonDescription *pSK = pDataDefs->arrDataDescriptions[i].Data.SkeletonDescription;
+        for(int i=0; i < pSK->nRigidBodies; i++)
+        {
+            // Note: Within FrameOfMocapData, skeleton rigid body ids are of the form:
+            //   parent skeleton ID   : high word (upper 16 bits of int)
+            //   rigid body id        : low word  (lower 16 bits of int)
+            // 
+            // However within DataDescriptions they are not, so apply that here for correct lookup during streaming
+          int id = pSK->RigidBodies[i].ID | (pSK->skeletonID << 16);
+          mapIDToName[id] = std::string(pSK->RigidBodies[i].szName);
+        }
+        iSkel++;
+    }
+    else
       continue;
-    
-    sRigidBodyDescription *pRB = pDataDefs->arrDataDescriptions[i].Data.RigidBodyDescription;
-    //construct skeleton hierarchy
-    int ID        = pRB->ID;
-    int parentID  = pRB->parentID;
-    float offsetx = pRB->offsetx;
-    float offsety = pRB->offsety;
-    float offsetz = pRB->offsetz;
   }
 
   return true;
 }
 
-// Handler for NatNet messages. 
+// [Optional] Handler for NatNet messages. 
 void MessageHandler(int msgType, char* msg)
 {
   //	printf("\n[SampleClient] Message received: %s\n", msg);
@@ -556,26 +676,28 @@ void DataHandler(sFrameOfMocapData* data, void* pUserData)
   int mcount = min(MarkerPositionCollection::MAX_MARKER_COUNT,data->MocapData->nMarkers);
   markerPositions.SetMarkerPositions(data->MocapData->Markers, mcount);
 
-  // unidentified markers
+  // labeled markers
+  markerPositions.SetLabledMarkers(data->LabeledMarkers, data->nLabeledMarkers);
+
+  // unlabeled markers
   mcount = min(MarkerPositionCollection::MAX_MARKER_COUNT,data->nOtherMarkers);
   markerPositions.AppendMarkerPositions(data->OtherMarkers, mcount);
 
+  // rigid bodies
   int rbcount = min(RigidBodyCollection::MAX_RIGIDBODY_COUNT, data->nRigidBodies);
   rigidBodies.SetRigidBodyData(data->RigidBodies, rbcount);
 
+  // skeleton segment (bones) as collection of rigid bodies
   for (int s = 0; s < data->nSkeletons; s++)
   {
     rigidBodies.AppendRigidBodyData(data->Skeletons[s].RigidBodyData, data->Skeletons[s].nRigidBodies);
   }
 
-  markerPositions.SetLabledMarkers(data->LabeledMarkers, data->nLabeledMarkers);
-
   // timecode
   NatNetClient* pClient = (NatNetClient*)pUserData;
-  // decode to values
   int hour, minute, second, frame, subframe;
   bool bValid = pClient->DecodeTimecode(data->Timecode, data->TimecodeSubframe, &hour, &minute, &second, &frame, &subframe);
-  // decode to friendly string
+  // decode timecode into friendly string
   pClient->TimecodeStringify(data->Timecode, data->TimecodeSubframe, szTimecode, 128);
 
   render = true;

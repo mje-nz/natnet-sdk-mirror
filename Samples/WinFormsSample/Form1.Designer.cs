@@ -30,24 +30,17 @@ namespace WinFormTestApp
         {
             this.components = new System.ComponentModel.Container();
             System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle1 = new System.Windows.Forms.DataGridViewCellStyle();
+            System.Windows.Forms.DataVisualization.Charting.ChartArea chartArea1 = new System.Windows.Forms.DataVisualization.Charting.ChartArea();
+            System.Windows.Forms.DataVisualization.Charting.Legend legend1 = new System.Windows.Forms.DataVisualization.Charting.Legend();
+            System.Windows.Forms.DataVisualization.Charting.Series series1 = new System.Windows.Forms.DataVisualization.Charting.Series();
+            System.Windows.Forms.DataVisualization.Charting.Title title1 = new System.Windows.Forms.DataVisualization.Charting.Title();
             System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle2 = new System.Windows.Forms.DataGridViewCellStyle();
             System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle3 = new System.Windows.Forms.DataGridViewCellStyle();
             System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle4 = new System.Windows.Forms.DataGridViewCellStyle();
             System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle5 = new System.Windows.Forms.DataGridViewCellStyle();
             System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle6 = new System.Windows.Forms.DataGridViewCellStyle();
             System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle7 = new System.Windows.Forms.DataGridViewCellStyle();
-            System.Windows.Forms.DataVisualization.Charting.ChartArea chartArea1 = new System.Windows.Forms.DataVisualization.Charting.ChartArea();
-            System.Windows.Forms.DataVisualization.Charting.Legend legend1 = new System.Windows.Forms.DataVisualization.Charting.Legend();
-            System.Windows.Forms.DataVisualization.Charting.Series series1 = new System.Windows.Forms.DataVisualization.Charting.Series();
-            System.Windows.Forms.DataVisualization.Charting.Title title1 = new System.Windows.Forms.DataVisualization.Charting.Title();
             this.dataGridView1 = new System.Windows.Forms.DataGridView();
-            this.ID = new System.Windows.Forms.DataGridViewTextBoxColumn();
-            this.X = new System.Windows.Forms.DataGridViewTextBoxColumn();
-            this.Y = new System.Windows.Forms.DataGridViewTextBoxColumn();
-            this.Z = new System.Windows.Forms.DataGridViewTextBoxColumn();
-            this.Yaw = new System.Windows.Forms.DataGridViewTextBoxColumn();
-            this.Pitch = new System.Windows.Forms.DataGridViewTextBoxColumn();
-            this.Roll = new System.Windows.Forms.DataGridViewTextBoxColumn();
             this.listView1 = new System.Windows.Forms.ListView();
             this.columnHeader1 = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
             this.columnHeader2 = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
@@ -62,6 +55,10 @@ namespace WinFormTestApp
             this.TimelinePlayButton = new System.Windows.Forms.Button();
             this.tabControl1 = new System.Windows.Forms.TabControl();
             this.tabPage1 = new System.Windows.Forms.TabPage();
+            this.TimecodeValue = new System.Windows.Forms.Label();
+            this.TimestampValue = new System.Windows.Forms.Label();
+            this.label4 = new System.Windows.Forms.Label();
+            this.TimestampLabel = new System.Windows.Forms.Label();
             this.comboBoxLocal = new System.Windows.Forms.ComboBox();
             this.label3 = new System.Windows.Forms.Label();
             this.Local = new System.Windows.Forms.Label();
@@ -76,7 +73,13 @@ namespace WinFormTestApp
             this.SetRecordingTakeButton = new System.Windows.Forms.Button();
             this.RecordingTakeNameText = new System.Windows.Forms.TextBox();
             this.EditModeButton = new System.Windows.Forms.Button();
-            this.TimestampLabel = new System.Windows.Forms.Label();
+            this.ID = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.X = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.Y = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.Z = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.Yaw = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.Pitch = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.Roll = new System.Windows.Forms.DataGridViewTextBoxColumn();
             ((System.ComponentModel.ISupportInitialize)(this.dataGridView1)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.chart1)).BeginInit();
             this.tabControl1.SuspendLayout();
@@ -116,82 +119,6 @@ namespace WinFormTestApp
             this.dataGridView1.SelectionMode = System.Windows.Forms.DataGridViewSelectionMode.CellSelect;
             this.dataGridView1.Size = new System.Drawing.Size(560, 345);
             this.dataGridView1.TabIndex = 1;
-            // 
-            // ID
-            // 
-            this.ID.AutoSizeMode = System.Windows.Forms.DataGridViewAutoSizeColumnMode.None;
-            this.ID.FillWeight = 62.07922F;
-            this.ID.HeaderText = "ID";
-            this.ID.MinimumWidth = 50;
-            this.ID.Name = "ID";
-            this.ID.ReadOnly = true;
-            this.ID.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
-            // 
-            // X
-            // 
-            dataGridViewCellStyle2.Format = "N4";
-            dataGridViewCellStyle2.NullValue = null;
-            this.X.DefaultCellStyle = dataGridViewCellStyle2;
-            this.X.FillWeight = 22.52875F;
-            this.X.HeaderText = "X";
-            this.X.Name = "X";
-            this.X.ReadOnly = true;
-            this.X.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
-            // 
-            // Y
-            // 
-            dataGridViewCellStyle3.Format = "N2";
-            dataGridViewCellStyle3.NullValue = null;
-            this.Y.DefaultCellStyle = dataGridViewCellStyle3;
-            this.Y.FillWeight = 22.52875F;
-            this.Y.HeaderText = "Y";
-            this.Y.Name = "Y";
-            this.Y.ReadOnly = true;
-            this.Y.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
-            // 
-            // Z
-            // 
-            dataGridViewCellStyle4.Format = "N2";
-            dataGridViewCellStyle4.NullValue = null;
-            this.Z.DefaultCellStyle = dataGridViewCellStyle4;
-            this.Z.FillWeight = 22.52875F;
-            this.Z.HeaderText = "Z";
-            this.Z.Name = "Z";
-            this.Z.ReadOnly = true;
-            this.Z.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
-            // 
-            // Yaw
-            // 
-            dataGridViewCellStyle5.Format = "N2";
-            dataGridViewCellStyle5.NullValue = null;
-            this.Yaw.DefaultCellStyle = dataGridViewCellStyle5;
-            this.Yaw.FillWeight = 22.52875F;
-            this.Yaw.HeaderText = "Yaw (Y)";
-            this.Yaw.Name = "Yaw";
-            this.Yaw.ReadOnly = true;
-            this.Yaw.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
-            // 
-            // Pitch
-            // 
-            dataGridViewCellStyle6.Format = "N2";
-            dataGridViewCellStyle6.NullValue = null;
-            this.Pitch.DefaultCellStyle = dataGridViewCellStyle6;
-            this.Pitch.FillWeight = 22.52875F;
-            this.Pitch.HeaderText = "Pitch (X)";
-            this.Pitch.Name = "Pitch";
-            this.Pitch.ReadOnly = true;
-            this.Pitch.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
-            // 
-            // Roll
-            // 
-            dataGridViewCellStyle7.Format = "N2";
-            dataGridViewCellStyle7.NullValue = null;
-            this.Roll.DefaultCellStyle = dataGridViewCellStyle7;
-            this.Roll.FillWeight = 22.52875F;
-            this.Roll.HeaderText = "Roll (Z)";
-            this.Roll.Name = "Roll";
-            this.Roll.ReadOnly = true;
-            this.Roll.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
             // 
             // listView1
             // 
@@ -371,6 +298,9 @@ namespace WinFormTestApp
             // 
             // tabPage1
             // 
+            this.tabPage1.Controls.Add(this.TimecodeValue);
+            this.tabPage1.Controls.Add(this.TimestampValue);
+            this.tabPage1.Controls.Add(this.label4);
             this.tabPage1.Controls.Add(this.TimestampLabel);
             this.tabPage1.Controls.Add(this.comboBoxLocal);
             this.tabPage1.Controls.Add(this.label3);
@@ -388,6 +318,42 @@ namespace WinFormTestApp
             this.tabPage1.TabIndex = 0;
             this.tabPage1.Text = "Connect";
             this.tabPage1.UseVisualStyleBackColor = true;
+            // 
+            // TimecodeValue
+            // 
+            this.TimecodeValue.AutoSize = true;
+            this.TimecodeValue.Location = new System.Drawing.Point(201, 141);
+            this.TimecodeValue.Name = "TimecodeValue";
+            this.TimecodeValue.Size = new System.Drawing.Size(43, 13);
+            this.TimecodeValue.TabIndex = 21;
+            this.TimecodeValue.Text = "<none>";
+            // 
+            // TimestampValue
+            // 
+            this.TimestampValue.AutoSize = true;
+            this.TimestampValue.Location = new System.Drawing.Point(70, 141);
+            this.TimestampValue.Name = "TimestampValue";
+            this.TimestampValue.Size = new System.Drawing.Size(43, 13);
+            this.TimestampValue.TabIndex = 20;
+            this.TimestampValue.Text = "<none>";
+            // 
+            // label4
+            // 
+            this.label4.AutoSize = true;
+            this.label4.Location = new System.Drawing.Point(142, 141);
+            this.label4.Name = "label4";
+            this.label4.Size = new System.Drawing.Size(60, 13);
+            this.label4.TabIndex = 19;
+            this.label4.Text = "Timecode :";
+            // 
+            // TimestampLabel
+            // 
+            this.TimestampLabel.AutoSize = true;
+            this.TimestampLabel.Location = new System.Drawing.Point(9, 141);
+            this.TimestampLabel.Name = "TimestampLabel";
+            this.TimestampLabel.Size = new System.Drawing.Size(67, 13);
+            this.TimestampLabel.TabIndex = 18;
+            this.TimestampLabel.Text = "Timestamp : ";
             // 
             // comboBoxLocal
             // 
@@ -530,13 +496,81 @@ namespace WinFormTestApp
             this.EditModeButton.UseVisualStyleBackColor = true;
             this.EditModeButton.Click += new System.EventHandler(this.EditModeButton_Click);
             // 
-            // TimestampLabel
+            // ID
             // 
-            this.TimestampLabel.AutoSize = true;
-            this.TimestampLabel.Location = new System.Drawing.Point(247, 108);
-            this.TimestampLabel.Name = "TimestampLabel";
-            this.TimestampLabel.Size = new System.Drawing.Size(0, 13);
-            this.TimestampLabel.TabIndex = 18;
+            this.ID.AutoSizeMode = System.Windows.Forms.DataGridViewAutoSizeColumnMode.None;
+            this.ID.FillWeight = 62.07922F;
+            this.ID.HeaderText = "ID";
+            this.ID.MinimumWidth = 50;
+            this.ID.Name = "ID";
+            this.ID.ReadOnly = true;
+            this.ID.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
+            // 
+            // X
+            // 
+            dataGridViewCellStyle2.Format = "N4";
+            dataGridViewCellStyle2.NullValue = null;
+            this.X.DefaultCellStyle = dataGridViewCellStyle2;
+            this.X.FillWeight = 22.52875F;
+            this.X.HeaderText = "X";
+            this.X.Name = "X";
+            this.X.ReadOnly = true;
+            this.X.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
+            // 
+            // Y
+            // 
+            dataGridViewCellStyle3.Format = "N2";
+            dataGridViewCellStyle3.NullValue = null;
+            this.Y.DefaultCellStyle = dataGridViewCellStyle3;
+            this.Y.FillWeight = 22.52875F;
+            this.Y.HeaderText = "Y";
+            this.Y.Name = "Y";
+            this.Y.ReadOnly = true;
+            this.Y.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
+            // 
+            // Z
+            // 
+            dataGridViewCellStyle4.Format = "N2";
+            dataGridViewCellStyle4.NullValue = null;
+            this.Z.DefaultCellStyle = dataGridViewCellStyle4;
+            this.Z.FillWeight = 22.52875F;
+            this.Z.HeaderText = "Z";
+            this.Z.Name = "Z";
+            this.Z.ReadOnly = true;
+            this.Z.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
+            // 
+            // Yaw
+            // 
+            dataGridViewCellStyle5.Format = "N2";
+            dataGridViewCellStyle5.NullValue = null;
+            this.Yaw.DefaultCellStyle = dataGridViewCellStyle5;
+            this.Yaw.FillWeight = 22.52875F;
+            this.Yaw.HeaderText = "Pitch (X)";
+            this.Yaw.Name = "Yaw";
+            this.Yaw.ReadOnly = true;
+            this.Yaw.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
+            // 
+            // Pitch
+            // 
+            dataGridViewCellStyle6.Format = "N2";
+            dataGridViewCellStyle6.NullValue = null;
+            this.Pitch.DefaultCellStyle = dataGridViewCellStyle6;
+            this.Pitch.FillWeight = 22.52875F;
+            this.Pitch.HeaderText = "Yaw (Y)";
+            this.Pitch.Name = "Pitch";
+            this.Pitch.ReadOnly = true;
+            this.Pitch.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
+            // 
+            // Roll
+            // 
+            dataGridViewCellStyle7.Format = "N2";
+            dataGridViewCellStyle7.NullValue = null;
+            this.Roll.DefaultCellStyle = dataGridViewCellStyle7;
+            this.Roll.FillWeight = 22.52875F;
+            this.Roll.HeaderText = "Roll (Z)";
+            this.Roll.Name = "Roll";
+            this.Roll.ReadOnly = true;
+            this.Roll.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
             // 
             // Form1
             // 
@@ -593,6 +627,12 @@ namespace WinFormTestApp
         private System.Windows.Forms.Label label3;
         private System.Windows.Forms.Button StopRecordButton;
         private System.Windows.Forms.ComboBox comboBoxLocal;
+        private System.Windows.Forms.Button SetPlaybackTakeButton;
+        private System.Windows.Forms.TextBox PlaybackTakeNameText;
+        private System.Windows.Forms.Label TimestampLabel;
+        private System.Windows.Forms.Label TimecodeValue;
+        private System.Windows.Forms.Label TimestampValue;
+        private System.Windows.Forms.Label label4;
         private System.Windows.Forms.DataGridViewTextBoxColumn ID;
         private System.Windows.Forms.DataGridViewTextBoxColumn X;
         private System.Windows.Forms.DataGridViewTextBoxColumn Y;
@@ -600,9 +640,6 @@ namespace WinFormTestApp
         private System.Windows.Forms.DataGridViewTextBoxColumn Yaw;
         private System.Windows.Forms.DataGridViewTextBoxColumn Pitch;
         private System.Windows.Forms.DataGridViewTextBoxColumn Roll;
-        private System.Windows.Forms.Button SetPlaybackTakeButton;
-        private System.Windows.Forms.TextBox PlaybackTakeNameText;
-        private System.Windows.Forms.Label TimestampLabel;
     }
 }
 
