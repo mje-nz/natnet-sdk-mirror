@@ -1,6 +1,8 @@
 
 #pragma once
 
+#include "NatNetTypes.h"
+
 class ClientCore;
 
 // Data callback function prototype

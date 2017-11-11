@@ -14,7 +14,6 @@
 //=============================================================================
 
 
-
 /*
 
 UnitySample.cpp
@@ -24,7 +23,7 @@ outputs XML locally over UDP to Unity.  The purpose is to illustrate how to get 
 
 Usage [optional]:
 
-	UnitySample [ServerIP] [LocalIP]
+	UnitySample [ServerIP] [LocalIP] [Unity3D IP]
 
 	[ServerIP]			IP address of the server (e.g. 192.168.0.107) ( defaults to local machine)
 */
@@ -45,7 +44,7 @@ Usage [optional]:
 
 //== Slip Stream globals ==--
 
-cSlipStream gSlipStream("127.0.0.1",16000);
+cSlipStream *gSlipStream;
 std::map<int, std::string> gBoneNames;
 
 #pragma warning( disable : 4996 )
@@ -63,6 +62,7 @@ FILE* fp;
 
 char szMyIPAddress[128] = "";
 char szServerIPAddress[128] = "";
+char szUnityIPAddress[128] = "";
 
 void SendXMLToUnity(sFrameOfMocapData *data, void* pUserData);
 
@@ -93,6 +93,18 @@ int _tmain(int argc, _TCHAR* argv[])
         strcpy(szMyIPAddress, "");          // not specified - assume server is local machine
         printf("Connecting from LocalMachine...\n");
     }
+    if(argc>3)
+    {
+        strcpy(szUnityIPAddress, argv[3]);	    // specified on command line
+        printf("Connecting to Unity3D at %s...\n", szUnityIPAddress);
+    }
+    else
+    {
+        strcpy(szUnityIPAddress, "127.0.0.1");          // not specified - assume server is local machine
+        printf("Connecting to Unity3D on LocalMachine...\n");
+    }
+
+    gSlipStream = new cSlipStream(szUnityIPAddress,16000);
 
     // Create NatNet Client
     iResult = CreateClient(iConnectionType);
@@ -376,7 +388,7 @@ void SendFrameToUnity(sFrameOfMocapData *data, void *pUserData)
 
         // stream xml data over UDP via SlipStream ==--
 
-        gSlipStream.Stream( (unsigned char *) buffer, (int) strlen(buffer) );
+        gSlipStream->Stream( (unsigned char *) buffer, (int) strlen(buffer) );
     } 
 }
 

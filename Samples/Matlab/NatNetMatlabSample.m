@@ -42,11 +42,17 @@ function NatNetMatlabSample()
 
         % Connect to an OptiTrack server (e.g. Motive)
         display('[NatNet] Connecting to OptiTrack Server.')
-        hst = java.net.InetAddress.getLocalHost;
-        %HostIP = char(hst.getHostAddress);
+        
+		% Connect to another computer's stream.
+        %LocalIP = char('10.0.1.1'); % Enter your local IP address
+        %ServerIP = char('10.0.1.200'); % Enter the server's IP address
+        %flg = theClient.Initialize(LocalIP, ServerIP); % Flg = returnCode: 0 = Success
+		
+        % Connect to a local stream.
         HostIP = char('127.0.0.1');
         flg = theClient.Initialize(HostIP, HostIP); % Flg = returnCode: 0 = Success
-        if (flg == 0)
+        
+		if (flg == 0)
             display('[NatNet] Initialization Succeeded')
         else
             display('[NatNet] Initialization Failed')
@@ -270,14 +276,16 @@ function GetDataDescriptions( theClient )
         descriptor = dataDescriptions.Item(idx-1);
         if(descriptor.type == 0)
             fprintf('\tMarkerSet \t: ');
+            fprintf('%s\n', char(descriptor.Name));
         elseif(descriptor.type == 1)
             fprintf('\tRigid Body \t: ');                
+            fprintf('%s\n', char(descriptor.Name));
         elseif(descriptor.type == 2)
             fprintf('\tSkeleton \t: ');               
+            fprintf('%s\n', char(descriptor.Name));
         else
             fprintf('\tUnknown data type : ');               
         end
-        fprintf('%s\n', char(descriptor.Name));
     end
 
     for idx = 1 : dataDescriptions.Count

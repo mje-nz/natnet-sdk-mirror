@@ -5,6 +5,20 @@ This repository contains each version of NaturalPoint's [NatNet SDK](http://opti
 
 ## Changelog
 
+__2.9.0__ _(October 19, 2015)_
+
+Features & Enhancements
+
+* Added: Motive 1.9 streaming support.
+* Added: Stream ID of unlabeled markers over NatNet. Please refer to updated Winforms sample to show new unlabeled marker data access.
+* Added: Add Force Plate information to data descriptions and FrameOfMocapData structure. ( Bitstream syntax change)
+* Added: (NatNet Managed Library (NatNetML) only) Update Winforms sample to illustrate data polling as an alternative to data callback.
+
+Fixes
+
+* Fixed: (NatNet Managed Library (NatNetML) only) Update NatNetML with marker parameter data (e.g. occluded flag)
+
+
 __2.8.0__ _(September 2, 2015)_
 
 Features & Enhancements

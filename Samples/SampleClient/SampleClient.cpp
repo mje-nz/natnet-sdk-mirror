@@ -59,6 +59,8 @@ FILE* fp;
 char szMyIPAddress[128] = "";
 char szServerIPAddress[128] = "";
 
+int analogSamplesPerMocapFrame = 0;
+
 int _tmain(int argc, _TCHAR* argv[])
 {
     int iResult;
@@ -155,6 +157,23 @@ int _tmain(int argc, _TCHAR* argv[])
                     printf("  RigidBody Parent ID : %d\n", pRB->parentID);
                     printf("  Parent Offset : %3.2f,%3.2f,%3.2f\n", pRB->offsetx, pRB->offsety, pRB->offsetz);
                 }
+            }
+            else if(pDataDefs->arrDataDescriptions[i].type == Descriptor_ForcePlate)
+            {
+                // Force Plate
+                sForcePlateDescription* pFP = pDataDefs->arrDataDescriptions[i].Data.ForcePlateDescription;
+                printf("Force Plate ID : %d\n", pFP->ID);
+                printf("Force Plate Serial : %s\n", pFP->strSerialNo);
+                printf("Force Plate Width : %3.2f\n", pFP->fWidth);
+                printf("Force Plate Length : %3.2f\n", pFP->fLength);
+                printf("Force Plate Electrical Center Offset (%3.3f, %3.3f, %3.3f)\n", pFP->fOriginX,pFP->fOriginY, pFP->fOriginZ);
+                for(int iCorner=0; iCorner<4; iCorner++)
+                    printf("Force Plate Corner %d : (%3.4f, %3.4f, %3.4f)\n", iCorner, pFP->fCorners[iCorner][0],pFP->fCorners[iCorner][1],pFP->fCorners[iCorner][2]);
+                printf("Force Plate Type : %d\n", pFP->iPlateType);
+                printf("Force Plate Data Type : %d\n", pFP->iChannelDataType);
+                printf("Force Plate Channel Count : %d\n", pFP->nChannels);
+                for(int iChannel=0; iChannel<pFP->nChannels; iChannel++)
+                    printf("\tChannel %d : %s\n", iChannel, pFP->szChannelNames[iChannel]);
             }
             else
             {
@@ -265,6 +284,12 @@ int CreateClient(int iConnectionType)
     // create NatNet client
     theClient = new NatNetClient(iConnectionType);
 
+
+
+    // set the callback handlers
+    theClient->SetVerbosityLevel(Verbosity_Warning);
+    theClient->SetMessageCallback(MessageHandler);
+    theClient->SetDataCallback( DataHandler, theClient );	// this function will receive data from the server
     // [optional] use old multicast group
     //theClient->SetMulticastAddress("224.0.0.1");
 
@@ -273,13 +298,8 @@ int CreateClient(int iConnectionType)
     theClient->NatNetVersion(ver);
     printf("NatNet Sample Client (NatNet ver. %d.%d.%d.%d)\n", ver[0], ver[1], ver[2], ver[3]);
 
-    // Set callback handlers
-    theClient->SetMessageCallback(MessageHandler);
-    theClient->SetVerbosityLevel(Verbosity_Debug);
-    theClient->SetDataCallback( DataHandler, theClient );	// this function will receive data from the server
-
     // Init Client and connect to NatNet server
-    // to use NatNet default port assigments
+    // to use NatNet default port assignments
     int retCode = theClient->Initialize(szMyIPAddress, szServerIPAddress);
     // to use a different port for commands and/or data:
     //int retCode = theClient->Initialize(szMyIPAddress, szServerIPAddress, MyServersCommandPort, MyServersDataPort);
@@ -290,6 +310,17 @@ int CreateClient(int iConnectionType)
     }
     else
     {
+        // get # of analog samples per mocap frame of data
+        void* pResult;
+        int ret = 0;
+        int nBytes = 0;
+        ret = theClient->SendMessageAndWait("AnalogSamplesPerMocapFrame", &pResult, &nBytes);
+        if (ret == ErrorCode_OK)
+        {
+            analogSamplesPerMocapFrame = *((int*)pResult);
+            printf("Analog Samples Per Mocap Frame : %d", analogSamplesPerMocapFrame);
+        }
+
         // print server info
         sServerDescription ServerDescription;
         memset(&ServerDescription, 0, sizeof(ServerDescription));
@@ -435,6 +466,32 @@ void __cdecl DataHandler(sFrameOfMocapData* data, void* pUserData)
 		printf("Labeled Marker [ModelID=%d, MarkerID=%d, Occluded=%d, PCSolved=%d, ModelSolved=%d] [size=%3.2f] [pos=%3.2f,%3.2f,%3.2f]\n",
             modelID, markerID, bOccluded, bPCSolved, bModelSolved,  marker.size, marker.x, marker.y, marker.z);
 	}
+
+    // force plates
+    if(data->nForcePlates==0)
+    {
+        printf("No Plates\n");
+    }
+    printf("Force Plate [Count=%d]\n", data->nForcePlates);
+    for(int iPlate=0; iPlate < data->nForcePlates; iPlate++)
+    {
+        printf("Force Plate %d\n", data->ForcePlates[iPlate].ID);
+        for(int iChannel=0; iChannel < data->ForcePlates[iPlate].nChannels; iChannel++)
+        {
+            printf("\tChannel %d:\t", iChannel);
+            if(data->ForcePlates[iPlate].ChannelData[iChannel].nFrames == 0)
+            {
+                printf("\tEmpty Frame\n");
+            }
+            else if(data->ForcePlates[iPlate].ChannelData[iChannel].nFrames != analogSamplesPerMocapFrame)
+            {
+                printf("\tPartial Frame [Expected:%d   Actual:%d]\n", analogSamplesPerMocapFrame, data->ForcePlates[iPlate].ChannelData[iChannel].nFrames);
+            }
+            for(int iSample=0; iSample < data->ForcePlates[iPlate].ChannelData[iChannel].nFrames; iSample++)
+                printf("%3.2f\t", data->ForcePlates[iPlate].ChannelData[iChannel].Values[iSample]);
+            printf("\n");
+        }
+    }
 
 }
 

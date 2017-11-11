@@ -14,6 +14,7 @@
 //=============================================================================
 
 using System;
+using System.IO;
 using System.Collections.Generic;
 using System.Collections;
 using System.ComponentModel;
@@ -65,6 +66,9 @@ namespace WinFormTestApp
         Hashtable htRigidBodies = new Hashtable();
         List<RigidBody> mRigidBodies = new List<RigidBody>();
 
+        Hashtable htForcePlates = new Hashtable();
+        List<ForcePlate> mForcePlates = new List<ForcePlate>();
+
         // graphing support
         const int GraphFrames = 500;
         int m_iLastFrameNumber = 0;
@@ -76,16 +80,31 @@ namespace WinFormTestApp
         QueryPerfCounter m_FramePeriodTimer = new QueryPerfCounter();
         QueryPerfCounter m_UIUpdateTimer = new QueryPerfCounter();
 
-        int mLastFrame = 0;
-
         // server information
         double m_ServerFramerate = 1.0f;
         float m_ServerToMillimeters = 1.0f;
         int m_UpAxis = 1;   // 0=x, 1=y, 2=z (Y default)
+        int mAnalogSamplesPerMocpaFrame = 0;
+        int mDroppedFrames = 0;
+        int mLastFrame = 0;
 
         private static object syncLock = new object();
         private delegate void OutputMessageCallback(string strMessage);
         private bool needMarkerListUpdate = false;
+        private bool mPaused = false;
+
+        // UI updating
+        delegate void UpdateUICallback();
+        bool mApplicationRunning = true;
+
+        // polling
+        delegate void PollCallback();
+        Thread pollThread;
+        bool mPolling = false;
+
+        bool mRecording = false;
+        TextWriter mWriter;
+
 
         public Form1()
         {
@@ -105,15 +124,60 @@ namespace WinFormTestApp
             int selected = comboBoxLocal.Items.Add("127.0.0.1");
             comboBoxLocal.SelectedItem = comboBoxLocal.Items[selected];
 
-            // create NatNet server
+            // create NatNet client
             int iConnectionType = 0;
             if (RadioUnicast.Checked)
                 iConnectionType = 1;
             int iResult = CreateClient(iConnectionType);
 
             // create data chart
-            chart1.Series[0].Points.Clear();
+            chart1.Series.Clear();
+            for (int i = 0; i < 5; i++)
+            {
+                System.Windows.Forms.DataVisualization.Charting.Series series = chart1.Series.Add("Series" + i.ToString());
+                series.ChartType = System.Windows.Forms.DataVisualization.Charting.SeriesChartType.FastLine;
+                chart1.Series[i].Points.Clear();
+            }
             chart1.ChartAreas[0].CursorX.IsUserSelectionEnabled = true;
+
+            // create and run an Update UI thread
+            UpdateUICallback d = new UpdateUICallback(UpdateUI);
+            var thread = new Thread(() =>
+            {
+                while (mApplicationRunning)
+                {
+                    try
+                    {
+                        this.Invoke(d);
+                        Thread.Sleep(15);
+                    }
+                    catch (System.Exception ex)
+                    {
+                        OutputMessage(ex.Message);
+                        break;
+                    }
+                }
+            });
+            thread.Start();
+
+            // create and run a polling thread
+            PollCallback pd = new PollCallback(PollData);
+            pollThread = new Thread(() =>
+            {
+                while (mPolling)
+                {
+                    try
+                    {
+                        this.Invoke(pd);
+                        Thread.Sleep(15);
+                    }
+                    catch (System.Exception ex)
+                    {
+                        OutputMessage(ex.Message);
+                        break;
+                    }
+                }
+            });
 
         }
 
@@ -194,13 +258,29 @@ namespace WinFormTestApp
                     try
                     {
                         m_ServerFramerate = BitConverter.ToSingle(response, 0);
-                        OutputMessage(String.Format("   Server Framerate: {0}", m_ServerFramerate));
+                        OutputMessage(String.Format("   Camera Framerate: {0}", m_ServerFramerate));
                     }
                     catch (System.Exception ex)
                     {
                         OutputMessage(ex.Message);
                     }
                 }
+
+                // [NatNet] [optional] Query mocap server for the current analog framerate
+                rc = m_NatNet.SendMessageAndWait("AnalogSamplesPerMocapFrame", out response, out nBytes);
+                if (rc == 0)
+                {
+                    try
+                    {
+                        mAnalogSamplesPerMocpaFrame = BitConverter.ToInt32(response, 0);
+                        OutputMessage(String.Format("   Analog Samples Per Camera Frame: {0}", mAnalogSamplesPerMocpaFrame));
+                    }
+                    catch (System.Exception ex)
+                    {
+                        OutputMessage(ex.Message);
+                    }
+                }
+
 
                 // [NatNet] [optional] Query mocap server for the current up axis
                 rc = m_NatNet.SendMessageAndWait("UpAxis", out response, out nBytes);
@@ -212,6 +292,7 @@ namespace WinFormTestApp
 
                 m_fCurrentMocapFrameTimestamp = 0.0f;
                 m_fFirstMocapFrameTimestamp = 0.0f;
+                mDroppedFrames = 0;
             }
             else
             {
@@ -253,6 +334,9 @@ namespace WinFormTestApp
 
         private void OutputMessage(string strMessage)
         {
+            if (mPaused)
+                return;
+
             if (this.listView1.InvokeRequired)
             {
                 // It's on a different thread, so use Invoke
@@ -292,19 +376,19 @@ namespace WinFormTestApp
             // clear graph if we've wrapped, allow for fudge
             if ((m_iLastFrameNumber - iFrame) > 400)
             {
-                chart1.Series[0].Points.Clear();
+                for (int i = 0; i < chart1.Series.Count; i++)
+                    chart1.Series[i].Points.Clear();
             }
 
-            if (dataGridView1.SelectedCells.Count > 0)
+            for (int i = 0; i < dataGridView1.SelectedCells.Count; i++)
             {
-                // use only the first selected cell
-                DataGridViewCell cell = dataGridView1.SelectedCells[0];
+                DataGridViewCell cell = dataGridView1.SelectedCells[i];
                 if (cell.Value == null)
                     return;
                 double dValue = 0.0f;
                 if (!Double.TryParse(cell.Value.ToString(), out dValue))
                     return;
-                chart1.Series[0].Points.AddXY(iFrame, (float)dValue);
+                chart1.Series[i].Points.AddXY(iFrame, (float)dValue);
             }
 
             // update red 'cursor' line
@@ -478,28 +562,73 @@ namespace WinFormTestApp
                 }
             }   // end skeleton update
 
+            // update ForcePlate data
+            if (htForcePlates.Count > 0)
+            {
+                for (int i = 0; i < m_FrameOfData.nForcePlates; i++)
+                {
+                    NatNetML.ForcePlateData fp = m_FrameOfData.ForcePlates[i];
+                    int key = fp.ID.GetHashCode();
+                    int rowIndex = (int)htForcePlates[key];
+                    if (rowIndex >= 0)
+                    {
+                        for (int iChannel = 0; iChannel < fp.nChannels; iChannel++)
+                        {
+                            if (fp.ChannelData[iChannel].nFrames > 0)
+                                dataGridView1.Rows[rowIndex].Cells[iChannel + 1].Value = fp.ChannelData[iChannel].Values[0];
+                        }
+                    }
+                }
+            }
 
             // update labeled markers data
             // remove previous dynamic marker list
             // for testing only - this simple approach to grid updating too slow for large marker count use
+            int rowOffset = htMarkers.Count + htRigidBodies.Count + htForcePlates.Count + 1;
+            int labeledCount = 0;
             if (false)
             {
-                int nRows = htMarkers.Count + htRigidBodies.Count;
                 int nTotalRows = dataGridView1.Rows.Count;
-                for (int i = nRows; i < nTotalRows; i++)
-                    dataGridView1.Rows.RemoveAt(nRows);
+                for (int i = rowOffset; i < nTotalRows; i++)
+                    dataGridView1.Rows.RemoveAt(rowOffset);
                 for (int i = 0; i < m_FrameOfData.nMarkers; i++)
                 {
                     NatNetML.Marker m = m_FrameOfData.LabeledMarkers[i];
 
                     int modelID, markerID;
                     m_NatNet.DecodeID(m.ID, out modelID, out markerID);
-                    int rowIndex = dataGridView1.Rows.Add("Labeled Marker (ModelID: " + modelID + "  MarkerID: " + markerID + ")");
+                    string name = "Labeled Marker (ModelID: " + modelID + "  MarkerID: " + markerID + ")";
+                    if (modelID == 0)
+                        name = "UnLabeled Marker ( ID: " + markerID + ")";
+                    int rowIndex = dataGridView1.Rows.Add(name);
+                    dataGridView1.Rows[rowIndex].Cells[1].Value = m.x;
+                    dataGridView1.Rows[rowIndex].Cells[2].Value = m.y;
+                    dataGridView1.Rows[rowIndex].Cells[3].Value = m.z;
+                    labeledCount++;
+                }
+            }
+
+            // DEPRECATED
+            // update unlabeled markers data
+            // remove previous dynamic marker list
+            // for testing only - this simple approach to grid updating too slow for large marker count use
+            rowOffset += labeledCount;
+            if (false)
+            {
+                int nTotalRows = dataGridView1.Rows.Count;
+                for (int i = rowOffset; i < nTotalRows; i++)
+                    dataGridView1.Rows.RemoveAt(rowOffset);
+                for (int i = 0; i < m_FrameOfData.nOtherMarkers; i++)
+                {
+                    NatNetML.Marker m = m_FrameOfData.OtherMarkers[i];
+                    int rowIndex = dataGridView1.Rows.Add("Unlabeled Marker (ID: " + m.ID + ")");
                     dataGridView1.Rows[rowIndex].Cells[1].Value = m.x;
                     dataGridView1.Rows[rowIndex].Cells[2].Value = m.y;
                     dataGridView1.Rows[rowIndex].Cells[3].Value = m.z;
                 }
             }
+
+
         }
 
         /// <summary>
@@ -509,6 +638,8 @@ namespace WinFormTestApp
         /// <param name="e"></param>
         private void buttonGetDataDescriptions_Click(object sender, EventArgs e)
         {
+            mForcePlates.Clear();
+            htForcePlates.Clear();
             mRigidBodies.Clear();
             dataGridView1.Rows.Clear();
             htMarkers.Clear();
@@ -563,7 +694,14 @@ namespace WinFormTestApp
                         int rowIndex = dataGridView1.Rows.Add("RigidBody: " + rb.Name);
                         // RigidBodyIDToRow map
                         int key = rb.ID.GetHashCode();
-                        htRigidBodies.Add(key, rowIndex);
+                        try
+                        {
+                            htRigidBodies.Add(key, rowIndex);
+                        }
+                        catch (Exception ex)
+                        {
+                            MessageBox.Show("Duplicate RigidBody ID Detected : " + ex.Message);
+                        }
 
                     }
                     // Skeletons
@@ -594,6 +732,26 @@ namespace WinFormTestApp
                                 htRigidBodies.Add(key, rowIndex);
                         }
                     }
+                    // ForcePlates
+                    else if (d.type == (int)NatNetML.DataDescriptorType.eForcePlateData)
+                    {
+                        NatNetML.ForcePlate fp = (NatNetML.ForcePlate)d;
+
+                        
+                        OutputMessage("Data Def " + iObject.ToString() + " [ForcePlate]");
+                        OutputMessage(" Name : " + fp.Serial);
+                        OutputMessage(" ID : " + fp.ID);
+                        OutputMessage(" Width : " + fp.Width);
+                        OutputMessage(" Length : " + fp.Length);
+
+                        mForcePlates.Add(fp);
+
+                        int rowIndex = dataGridView1.Rows.Add("ForcePlate: " + fp.Serial);
+                        // ForcePlateIDToRow map
+                        int key = fp.ID.GetHashCode();
+                        htForcePlates.Add(key, rowIndex);
+                    }
+
                     else
                     {
                         OutputMessage("Unknown DataType");
@@ -604,6 +762,52 @@ namespace WinFormTestApp
             {
                 OutputMessage("Unable to retrieve DataDescriptions");
             }
+        }
+
+        void ProcessFrameOfData(ref NatNetML.FrameOfMocapData data)
+        {
+            // detect and reported any 'reported' frame drop (as reported by server)
+            if (m_fLastFrameTimestamp != 0.0f)
+            {
+                double framePeriod = 1.0f / m_ServerFramerate;
+                double thisPeriod = data.fTimestamp - m_fLastFrameTimestamp;
+                double fudgeFactor = 0.002f; // 2 ms
+                if ((thisPeriod - framePeriod) > fudgeFactor)
+                {
+                    //OutputMessage("Frame Drop: ( ThisTS: " + data.fTimestamp.ToString("F3") + "  LastTS: " + m_fLastFrameTimestamp.ToString("F3") + " )");
+                    mDroppedFrames++;
+                }
+            }
+
+            // check and report frame drop (frame id based)
+            if (mLastFrame != 0)
+            {
+                if ((data.iFrame - mLastFrame) != 1)
+                {
+                    //OutputMessage("Frame Drop: ( ThisFrame: " + data.iFrame.ToString() + "  LastFrame: " + mLastFrame.ToString() + " )");
+                    //mDroppedFrames++;
+                }
+            }
+
+            // recording : write packet to data file
+            if (mRecording)
+            {
+                WriteFrame(data);
+            }
+
+            // [NatNet] Add the incoming frame of mocap data to our frame queue,  
+            // Note: the frame queue is a shared resource with the UI thread, so lock it while writing
+            lock (syncLock)
+            {
+                // [optional] clear the frame queue before adding a new frame
+                m_FrameQueue.Clear();
+                FrameOfMocapData deepCopy = new FrameOfMocapData(data);
+                m_FrameQueue.Enqueue(deepCopy);
+            }
+
+            mLastFrame = data.iFrame;
+            m_fLastFrameTimestamp = data.fTimestamp;
+
         }
 
         /// <summary>
@@ -628,30 +832,13 @@ namespace WinFormTestApp
             QueryPerfCounter intraTimer = new QueryPerfCounter();
             intraTimer.Start();
 
-            // check and report frame arrival period (time elapsed since previous frame arrived)
+            // detect and report and 'measured' frame drop (as measured by client)
             m_FramePeriodTimer.Stop();
             double elapsedMS = m_FramePeriodTimer.Duration();
-            if ( (mLastFrame % 100) == 0)
-            {
-                OutputMessage("FrameID:" + data.iFrame + "   Timestamp: " + data.fTimestamp + "   Period:" + elapsedMS);
-            }
 
-            // check and report frame drop
-            if ((mLastFrame != 0) && ((data.iFrame - mLastFrame) != 1))
-            {
-                OutputMessage("Frame Drop: ( ThisFrame: " + data.iFrame.ToString() + "  LastFrame: " + mLastFrame.ToString() + " )");
-            }
-            
-            // [NatNet] Add the incoming frame of mocap data to our frame queue,  
-            // Note: the frame queue is a shared resource with the UI thread, so lock it while writing
-            lock (syncLock)
-            {
-                // [optional] clear the frame queue before adding a new frame
-                m_FrameQueue.Clear();
-                FrameOfMocapData deepCopy = new FrameOfMocapData(data);
-                m_FrameQueue.Enqueue(deepCopy);
-            }
+            ProcessFrameOfData(ref data);
 
+            // report if we are taking too long, which blocks packet receiving, which if long enough would result in socket buffer drop
             intraTimer.Stop();
             elapsedIntraMS = intraTimer.Duration();
             if (elapsedIntraMS > 5.0f)
@@ -659,7 +846,6 @@ namespace WinFormTestApp
                 OutputMessage("Warning : Frame handler taking too long: " + elapsedIntraMS.ToString("F2"));
             }
 
-            mLastFrame = data.iFrame;
             m_FramePeriodTimer.Start();
 
         }
@@ -671,12 +857,123 @@ namespace WinFormTestApp
             m_NatNet_OnFrameReady(e.data, e.client);
         }
 
-        /// <summary>
-        /// Refresh the UI at a fixed period specified by the timer
-        /// </summary>
-        /// <param name="sender"></param>
-        /// <param name="e"></param>
-        private void UpdateUITimer_Tick(object sender, EventArgs e)
+        private void PollData()
+        {
+            FrameOfMocapData data = m_NatNet.GetLastFrameOfData();
+            ProcessFrameOfData(ref data);
+        }
+
+        private void SetDataPolling(bool poll)
+        {
+            if (poll)
+            {
+                // disable event based data handling
+                m_NatNet.OnFrameReady -= m_NatNet_OnFrameReady;
+
+                // enable polling 
+                mPolling = true;
+                pollThread.Start();
+            }
+            else
+            {
+                // disable polling
+                mPolling = false;
+
+                // enable event based data handling
+                m_NatNet.OnFrameReady += new NatNetML.FrameReadyEventHandler(m_NatNet_OnFrameReady);
+            }
+        }
+
+        private void GetLastFrameOfData()
+        {
+            FrameOfMocapData data = m_NatNet.GetLastFrameOfData();
+            ProcessFrameOfData(ref data);
+        }
+
+        private void GetLastFrameOfDataButton_Click(object sender, EventArgs e)
+        {
+            // [NatNet] GetLastFrameOfData can be used to poll for the most recent avail frame of mocap data.
+            // This mechanism is slower than the event handler mechanism, and in general is not recommended,
+            // since it must wait for a frame to become available and apply a lock to that frame while it copies
+            // the data to the returned value.
+
+            // get a copy of the most recent frame of data
+            // returns null if not available or cannot obtain a lock on it within a specified timeout
+            FrameOfMocapData data = m_NatNet.GetLastFrameOfData();
+            if (data != null)
+            {
+                // do something with the data
+                String frameInfo = String.Format("FrameID : {0}", data.iFrame);
+                OutputMessage(frameInfo);
+            }
+        }
+
+
+        private void WriteFrame(FrameOfMocapData data)
+        {
+            String str =  "";
+
+            str += data.fTimestamp.ToString("F3") + "\t";
+
+            // 'all' markerset data
+            for (int i = 0; i < m_FrameOfData.nMarkerSets; i++)
+            {
+                NatNetML.MarkerSetData ms = m_FrameOfData.MarkerSets[i];
+                if(ms.MarkerSetName == "all")
+                {
+                   for (int j = 0; j < ms.nMarkers; j++)
+                    {
+                       str += ms.Markers[j].x.ToString("F3") + "\t";
+                       str += ms.Markers[j].y.ToString("F3") + "\t";
+                       str += ms.Markers[j].z.ToString("F3") + "\t";
+                    }
+                }
+            }
+
+            // force plates
+            // just write first subframe from each channel (fx[0], fy[0], fz[0], mx[0], my[0], mz[0])
+            for (int i = 0; i < m_FrameOfData.nForcePlates; i++)
+            {
+                NatNetML.ForcePlateData fp = m_FrameOfData.ForcePlates[i];
+                for(int iChannel=0; iChannel < fp.nChannels; iChannel++)
+                {
+                    if(fp.ChannelData[iChannel].nFrames == 0)
+                    {
+                        str += 0.0f;    // empty frame
+                    }
+                    else
+                    {
+                        str += fp.ChannelData[iChannel].Values[0] + "\t";
+                    }
+                }
+            }
+
+            mWriter.WriteLine(str);
+        }
+
+        private void RecordDataButton_CheckedChanged(object sender, EventArgs e)
+        {
+            if (RecordDataButton.Checked)
+            {
+                try
+                {
+                    mWriter = File.CreateText("WinFormsData.txt");
+                    mRecording = true;
+                }
+                catch (System.Exception ex)
+                {
+                	
+                }
+            }
+            else
+            {
+                mWriter.Close();
+                mRecording = false;
+            }
+
+        }
+
+        private void UpdateUI()
         {
             m_UIUpdateTimer.Stop();
             double interframeDuration = m_UIUpdateTimer.Duration();
@@ -730,8 +1027,9 @@ namespace WinFormTestApp
                         }
 
                         // Mocap server timestamp (in seconds)
-                        m_fLastFrameTimestamp = m_FrameOfData.fTimestamp;
+                        //m_fLastFrameTimestamp = m_FrameOfData.fTimestamp;
                         TimestampValue.Text = m_FrameOfData.fTimestamp.ToString("F3");
+                        DroppedFrameCountLabel.Text = mDroppedFrames.ToString();
 
                         // SMPTE timecode (if timecode generator present)
                         int hour, minute, second, frame, subframe;
@@ -753,6 +1051,7 @@ namespace WinFormTestApp
 
         }
 
+
         public int LowWord(int number)
         {
             return number & 0xFFFF;
@@ -770,6 +1069,7 @@ namespace WinFormTestApp
 
         private void Form1_FormClosing(object sender, FormClosingEventArgs e)
         {
+            mApplicationRunning = false;
             m_NatNet.Uninitialize();
         }
 
@@ -791,20 +1091,45 @@ namespace WinFormTestApp
 
         private void RecordButton_Click(object sender, EventArgs e)
         {
+            string command = "StartRecording";
+
             int nBytes = 0;
             byte[] response = new byte[10000];
-            int rc = m_NatNet.SendMessageAndWait("StartRecording", 3, 100, out response, out nBytes);
+            int rc = m_NatNet.SendMessageAndWait(command, 3, 100, out response, out nBytes);
             if (rc != 0)
             {
-                OutputMessage("Warning : StartRecording return an error: " + rc.ToString("F2"));
+                OutputMessage(command + " not handled by server");
+            }
+            else
+            {
+                int opResult = System.BitConverter.ToInt32(response, 0);
+                if (opResult == 0)
+                    OutputMessage(command + " handled and succeeded.");
+                else
+                    OutputMessage(command + " handled but failed.");
             }
         }
 
         private void StopRecordButton_Click(object sender, EventArgs e)
         {
+            string command = "StopRecording";
+
             int nBytes = 0;
             byte[] response = new byte[10000];
-            int rc = m_NatNet.SendMessageAndWait("StopRecording", out response, out nBytes);
+            int rc = m_NatNet.SendMessageAndWait(command, out response, out nBytes);
+             
+            if (rc != 0)
+            {
+                OutputMessage(command + " not handled by server");
+            }
+            else
+            {
+                int opResult = System.BitConverter.ToInt32(response, 0);
+                if (opResult == 0)
+                    OutputMessage(command + " handled and succeeded.");
+                else
+                    OutputMessage(command + " handled but failed.");
+            }
         }
 
         private void LiveModeButton_Click(object sender, EventArgs e)
@@ -851,26 +1176,27 @@ namespace WinFormTestApp
             int rc = m_NatNet.SendMessageAndWait(strCommand, out response, out nBytes);
         }
 
-        private void GetLastFrameOfDataButton_Click(object sender, EventArgs e)
-        {
-            // [NatNet] GetLastFrameOfData can be used to poll for the most recent avail frame of mocap data.
-            // This mechanism is slower than the event handler mechanism, and in general is not recommended,
-            // since it must wait for a frame to become available and apply a lock to that frame while it copies
-            // the data to the returned value.
-
-            // get a copy of the most recent frame of data
-            // returns null if not available or cannot obtain a lock on it within a specified timeout
-            FrameOfMocapData data = m_NatNet.GetLastFrameOfData();
-            if(data != null)
-            {
-                // do something with the data
-                String frameInfo = String.Format("FrameID : {0}", data.iFrame);
-                OutputMessage(frameInfo);
-            }
-        }
-
         private void TestButton_Click(object sender, EventArgs e)
         {
+#if true
+            int nBytes = 0;
+            byte[] response = new byte[10000];
+            int rc;
+            rc = m_NatNet.SendMessageAndWait("FrameRate", out response, out nBytes);
+            if (rc == 0)
+            {
+                try
+                {
+                    m_ServerFramerate = BitConverter.ToSingle(response, 0);
+                    OutputMessage(String.Format("   Camera Framerate: {0}", m_ServerFramerate));
+                }
+                catch (System.Exception ex)
+                {
+                    OutputMessage(ex.Message);
+                }
+            }
+
+#else
             int nBytes = 0;
             byte[] response = new byte[10000];
             int testVal;
@@ -963,6 +1289,77 @@ namespace WinFormTestApp
                     OutputMessage(command + " handled but failed.");
             }
 
+#endif
+
+        }
+
+        private void contextMenuStrip1_Opening(object sender, CancelEventArgs e)
+        {
+
+        }
+
+        private void menuClear_Click(object sender, EventArgs e)
+        {
+            listView1.Items.Clear();
+        }
+
+        private void menuPause_Click(object sender, EventArgs e)
+        {
+            mPaused = menuPause.Checked;
+        }
+
+        private void GetTakeRangeButton_Click(object sender, EventArgs e)
+        {
+            int nBytes = 0;
+            byte[] response = new byte[10000];
+            int rc;
+            rc = m_NatNet.SendMessageAndWait("CurrentTakeLength", out response, out nBytes);
+            if (rc == 0)
+            {
+                try
+                {
+                    int takeLength = BitConverter.ToInt32(response, 0);
+                    OutputMessage(String.Format("Current Take Length: {0}", takeLength));
+                }
+                catch (System.Exception ex)
+                {
+                    OutputMessage(ex.Message);
+                }
+            }
+        }
+
+        private void GetModeButton_Click(object sender, EventArgs e)
+        {
+            int nBytes = 0;
+            byte[] response = new byte[10000];
+            int rc;
+            rc = m_NatNet.SendMessageAndWait("CurrentMode", out response, out nBytes);
+            if (rc == 0)
+            {
+                try
+                {
+                    String strMode = "";
+                    int mode = BitConverter.ToInt32(response, 0);
+                    if (mode == 0)
+                        strMode = String.Format("Mode : Live");
+                    else if (mode == 1)
+                        strMode = String.Format("Mode : Recording");
+                    else if (mode == 2)
+                        strMode = String.Format("Mode : Edit");
+                    OutputMessage(strMode);
+                }
+                catch (System.Exception ex)
+                {
+                    OutputMessage(ex.Message);
+                }
+            }
+        }
+
+
+
+        private void PollCheckBox_CheckedChanged(object sender, EventArgs e)
+        {
+            SetDataPolling(PollCheckBox.Checked);
         }
 
     }

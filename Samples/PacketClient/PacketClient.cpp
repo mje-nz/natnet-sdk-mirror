@@ -793,9 +793,20 @@ void Unpack(char* pData)
                         printf("\tMarker %d: id=%d\tsize=%3.1f\tpos=[%3.2f,%3.2f,%3.2f]\n", k, markerIDs[k], markerSizes[k], markerData[k*3], markerData[k*3+1],markerData[k*3+2]);
                     }
 
-                    // Mean marker error
-                    float fError = 0.0f; memcpy(&fError, ptr, 4); ptr += 4;
-                    printf("Mean marker error: %3.2f\n", fError);
+                    // Mean marker error (2.0 and later)
+                    if(major >= 2)
+                    {
+                        float fError = 0.0f; memcpy(&fError, ptr, 4); ptr += 4;
+                        printf("Mean marker error: %3.2f\n", fError);
+                    }
+
+                    // Tracking flags (2.6 and later)
+                    if( ((major == 2)&&(minor >= 6)) || (major > 2) || (major == 0) ) 
+                    {
+                        // params
+                        short params = 0; memcpy(&params, ptr, 2); ptr += 2;
+                        bool bTrackingValid = params & 0x01; // 0x01 : rigid body was successfully tracked in this frame
+                    }
 
                     // release resources
                     if(markerIDs)
@@ -844,6 +855,35 @@ void Unpack(char* pData)
 				printf("size: [%3.2f]\n", size);
 			}
 		}
+
+        // Force Plate data (version 2.9 and later)
+        if (((major == 2) && (minor >= 9)) || (major > 2))
+        {
+            int nForcePlates;
+            memcpy(&nForcePlates, ptr, 4); ptr += 4;
+            for (int iForcePlate = 0; iForcePlate < nForcePlates; iForcePlate++)
+            {
+                // ID
+                int ID = 0; memcpy(&ID, ptr, 4); ptr += 4;
+                printf("Force Plate : %d\n", ID);
+
+                // Channel Count
+                int nChannels = 0; memcpy(&nChannels, ptr, 4); ptr += 4;
+
+                // Channel Data
+                for (int i = 0; i < nChannels; i++)
+                {
+                    printf(" Channel %d : ", i);
+                    int nFrames = 0; memcpy(&nFrames, ptr, 4); ptr += 4;
+                    for (int j = 0; j < nFrames; j++)
+                    {
+                        float val = 0.0f;  memcpy(&val, ptr, 4); ptr += 4;
+                        printf("%3.2f   ", val);
+                    }
+                    printf("\n");
+                }
+            }
+        }
 
 		// latency
         float latency = 0.0f; memcpy(&latency, ptr, 4);	ptr += 4;

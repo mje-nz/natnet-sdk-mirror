@@ -51,17 +51,22 @@ namespace WinFormTestApp
             this.listView1 = new System.Windows.Forms.ListView();
             this.columnHeader1 = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
             this.columnHeader2 = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
+            this.contextMenuStrip1 = new System.Windows.Forms.ContextMenuStrip(this.components);
+            this.menuClear = new System.Windows.Forms.ToolStripMenuItem();
+            this.menuPause = new System.Windows.Forms.ToolStripMenuItem();
             this.checkBoxConnect = new System.Windows.Forms.CheckBox();
             this.buttonGetDataDescriptions = new System.Windows.Forms.Button();
             this.chart1 = new System.Windows.Forms.DataVisualization.Charting.Chart();
             this.label1 = new System.Windows.Forms.Label();
-            this.UpdateUITimer = new System.Windows.Forms.Timer(this.components);
             this.RecordButton = new System.Windows.Forms.Button();
             this.TimelineStopButton = new System.Windows.Forms.Button();
             this.LiveModeButton = new System.Windows.Forms.Button();
             this.TimelinePlayButton = new System.Windows.Forms.Button();
             this.tabControl1 = new System.Windows.Forms.TabControl();
             this.tabPage1 = new System.Windows.Forms.TabPage();
+            this.RecordDataButton = new System.Windows.Forms.CheckBox();
+            this.DroppedFrameCountLabel = new System.Windows.Forms.Label();
+            this.label6 = new System.Windows.Forms.Label();
             this.TimecodeValue = new System.Windows.Forms.Label();
             this.TimestampValue = new System.Windows.Forms.Label();
             this.label4 = new System.Windows.Forms.Label();
@@ -74,6 +79,9 @@ namespace WinFormTestApp
             this.RadioUnicast = new System.Windows.Forms.RadioButton();
             this.RadioMulticast = new System.Windows.Forms.RadioButton();
             this.tabPage2 = new System.Windows.Forms.TabPage();
+            this.GetModeButton = new System.Windows.Forms.Button();
+            this.GetTakeRangeButton = new System.Windows.Forms.Button();
+            this.TestButton = new System.Windows.Forms.Button();
             this.GetLastFrameOfDataButton = new System.Windows.Forms.Button();
             this.SetPlaybackTakeButton = new System.Windows.Forms.Button();
             this.PlaybackTakeNameText = new System.Windows.Forms.TextBox();
@@ -81,8 +89,9 @@ namespace WinFormTestApp
             this.SetRecordingTakeButton = new System.Windows.Forms.Button();
             this.RecordingTakeNameText = new System.Windows.Forms.TextBox();
             this.EditModeButton = new System.Windows.Forms.Button();
-            this.TestButton = new System.Windows.Forms.Button();
+            this.PollCheckBox = new System.Windows.Forms.CheckBox();
             ((System.ComponentModel.ISupportInitialize)(this.dataGridView1)).BeginInit();
+            this.contextMenuStrip1.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.chart1)).BeginInit();
             this.tabControl1.SuspendLayout();
             this.tabPage1.SuspendLayout();
@@ -206,6 +215,7 @@ namespace WinFormTestApp
             this.listView1.Columns.AddRange(new System.Windows.Forms.ColumnHeader[] {
             this.columnHeader1,
             this.columnHeader2});
+            this.listView1.ContextMenuStrip = this.contextMenuStrip1;
             this.listView1.GridLines = true;
             this.listView1.HeaderStyle = System.Windows.Forms.ColumnHeaderStyle.None;
             this.listView1.Location = new System.Drawing.Point(578, 261);
@@ -224,6 +234,30 @@ namespace WinFormTestApp
             // 
             this.columnHeader2.Text = "Message";
             this.columnHeader2.Width = 400;
+            // 
+            // contextMenuStrip1
+            // 
+            this.contextMenuStrip1.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.menuClear,
+            this.menuPause});
+            this.contextMenuStrip1.Name = "contextMenuStrip1";
+            this.contextMenuStrip1.Size = new System.Drawing.Size(106, 48);
+            this.contextMenuStrip1.Opening += new System.ComponentModel.CancelEventHandler(this.contextMenuStrip1_Opening);
+            // 
+            // menuClear
+            // 
+            this.menuClear.Name = "menuClear";
+            this.menuClear.Size = new System.Drawing.Size(105, 22);
+            this.menuClear.Text = "Clear";
+            this.menuClear.Click += new System.EventHandler(this.menuClear_Click);
+            // 
+            // menuPause
+            // 
+            this.menuPause.CheckOnClick = true;
+            this.menuPause.Name = "menuPause";
+            this.menuPause.Size = new System.Drawing.Size(105, 22);
+            this.menuPause.Text = "Pause";
+            this.menuPause.Click += new System.EventHandler(this.menuPause_Click);
             // 
             // checkBoxConnect
             // 
@@ -316,12 +350,6 @@ namespace WinFormTestApp
             this.label1.TabIndex = 13;
             this.label1.Text = "Messages";
             // 
-            // UpdateUITimer
-            // 
-            this.UpdateUITimer.Enabled = true;
-            this.UpdateUITimer.Interval = 10;
-            this.UpdateUITimer.Tick += new System.EventHandler(this.UpdateUITimer_Tick);
-            // 
             // RecordButton
             // 
             this.RecordButton.Location = new System.Drawing.Point(11, 69);
@@ -376,6 +404,10 @@ namespace WinFormTestApp
             // 
             // tabPage1
             // 
+            this.tabPage1.Controls.Add(this.PollCheckBox);
+            this.tabPage1.Controls.Add(this.RecordDataButton);
+            this.tabPage1.Controls.Add(this.DroppedFrameCountLabel);
+            this.tabPage1.Controls.Add(this.label6);
             this.tabPage1.Controls.Add(this.TimecodeValue);
             this.tabPage1.Controls.Add(this.TimestampValue);
             this.tabPage1.Controls.Add(this.label4);
@@ -392,15 +424,46 @@ namespace WinFormTestApp
             this.tabPage1.Location = new System.Drawing.Point(4, 22);
             this.tabPage1.Name = "tabPage1";
             this.tabPage1.Padding = new System.Windows.Forms.Padding(3);
-            this.tabPage1.Size = new System.Drawing.Size(355, 184);
+            this.tabPage1.Size = new System.Drawing.Size(355, 196);
             this.tabPage1.TabIndex = 0;
             this.tabPage1.Text = "Connect";
             this.tabPage1.UseVisualStyleBackColor = true;
             // 
+            // RecordDataButton
+            // 
+            this.RecordDataButton.Appearance = System.Windows.Forms.Appearance.Button;
+            this.RecordDataButton.FlatAppearance.CheckedBackColor = System.Drawing.Color.Red;
+            this.RecordDataButton.FlatAppearance.MouseDownBackColor = System.Drawing.Color.White;
+            this.RecordDataButton.Location = new System.Drawing.Point(247, 103);
+            this.RecordDataButton.Name = "RecordDataButton";
+            this.RecordDataButton.Size = new System.Drawing.Size(80, 23);
+            this.RecordDataButton.TabIndex = 24;
+            this.RecordDataButton.Text = "Record";
+            this.RecordDataButton.UseVisualStyleBackColor = true;
+            this.RecordDataButton.CheckedChanged += new System.EventHandler(this.RecordDataButton_CheckedChanged);
+            // 
+            // DroppedFrameCountLabel
+            // 
+            this.DroppedFrameCountLabel.AutoSize = true;
+            this.DroppedFrameCountLabel.Location = new System.Drawing.Point(100, 166);
+            this.DroppedFrameCountLabel.Name = "DroppedFrameCountLabel";
+            this.DroppedFrameCountLabel.Size = new System.Drawing.Size(43, 13);
+            this.DroppedFrameCountLabel.TabIndex = 23;
+            this.DroppedFrameCountLabel.Text = "<none>";
+            // 
+            // label6
+            // 
+            this.label6.AutoSize = true;
+            this.label6.Location = new System.Drawing.Point(9, 166);
+            this.label6.Name = "label6";
+            this.label6.Size = new System.Drawing.Size(94, 13);
+            this.label6.TabIndex = 22;
+            this.label6.Text = "Dropped Frames : ";
+            // 
             // TimecodeValue
             // 
             this.TimecodeValue.AutoSize = true;
-            this.TimecodeValue.Location = new System.Drawing.Point(201, 141);
+            this.TimecodeValue.Location = new System.Drawing.Point(255, 141);
             this.TimecodeValue.Name = "TimecodeValue";
             this.TimecodeValue.Size = new System.Drawing.Size(43, 13);
             this.TimecodeValue.TabIndex = 21;
@@ -409,7 +472,7 @@ namespace WinFormTestApp
             // TimestampValue
             // 
             this.TimestampValue.AutoSize = true;
-            this.TimestampValue.Location = new System.Drawing.Point(70, 141);
+            this.TimestampValue.Location = new System.Drawing.Point(100, 141);
             this.TimestampValue.Name = "TimestampValue";
             this.TimestampValue.Size = new System.Drawing.Size(43, 13);
             this.TimestampValue.TabIndex = 20;
@@ -418,7 +481,7 @@ namespace WinFormTestApp
             // label4
             // 
             this.label4.AutoSize = true;
-            this.label4.Location = new System.Drawing.Point(142, 141);
+            this.label4.Location = new System.Drawing.Point(196, 141);
             this.label4.Name = "label4";
             this.label4.Size = new System.Drawing.Size(60, 13);
             this.label4.TabIndex = 19;
@@ -502,6 +565,8 @@ namespace WinFormTestApp
             // 
             // tabPage2
             // 
+            this.tabPage2.Controls.Add(this.GetModeButton);
+            this.tabPage2.Controls.Add(this.GetTakeRangeButton);
             this.tabPage2.Controls.Add(this.TestButton);
             this.tabPage2.Controls.Add(this.GetLastFrameOfDataButton);
             this.tabPage2.Controls.Add(this.SetPlaybackTakeButton);
@@ -521,6 +586,36 @@ namespace WinFormTestApp
             this.tabPage2.TabIndex = 1;
             this.tabPage2.Text = "Commands";
             this.tabPage2.UseVisualStyleBackColor = true;
+            // 
+            // GetModeButton
+            // 
+            this.GetModeButton.Location = new System.Drawing.Point(228, 160);
+            this.GetModeButton.Name = "GetModeButton";
+            this.GetModeButton.Size = new System.Drawing.Size(98, 23);
+            this.GetModeButton.TabIndex = 30;
+            this.GetModeButton.Text = "Capture Mode?";
+            this.GetModeButton.UseVisualStyleBackColor = true;
+            this.GetModeButton.Click += new System.EventHandler(this.GetModeButton_Click);
+            // 
+            // GetTakeRangeButton
+            // 
+            this.GetTakeRangeButton.Location = new System.Drawing.Point(122, 160);
+            this.GetTakeRangeButton.Name = "GetTakeRangeButton";
+            this.GetTakeRangeButton.Size = new System.Drawing.Size(99, 23);
+            this.GetTakeRangeButton.TabIndex = 29;
+            this.GetTakeRangeButton.Text = "Get Range";
+            this.GetTakeRangeButton.UseVisualStyleBackColor = true;
+            this.GetTakeRangeButton.Click += new System.EventHandler(this.GetTakeRangeButton_Click);
+            // 
+            // TestButton
+            // 
+            this.TestButton.Location = new System.Drawing.Point(227, 131);
+            this.TestButton.Name = "TestButton";
+            this.TestButton.Size = new System.Drawing.Size(99, 23);
+            this.TestButton.TabIndex = 28;
+            this.TestButton.Text = "Test";
+            this.TestButton.UseVisualStyleBackColor = true;
+            this.TestButton.Click += new System.EventHandler(this.TestButton_Click);
             // 
             // GetLastFrameOfDataButton
             // 
@@ -586,15 +681,16 @@ namespace WinFormTestApp
             this.EditModeButton.UseVisualStyleBackColor = true;
             this.EditModeButton.Click += new System.EventHandler(this.EditModeButton_Click);
             // 
-            // TestButton
+            // PollCheckBox
             // 
-            this.TestButton.Location = new System.Drawing.Point(227, 131);
-            this.TestButton.Name = "TestButton";
-            this.TestButton.Size = new System.Drawing.Size(99, 23);
-            this.TestButton.TabIndex = 28;
-            this.TestButton.Text = "Test";
-            this.TestButton.UseVisualStyleBackColor = true;
-            this.TestButton.Click += new System.EventHandler(this.TestButton_Click);
+            this.PollCheckBox.AutoSize = true;
+            this.PollCheckBox.Location = new System.Drawing.Point(247, 73);
+            this.PollCheckBox.Name = "PollCheckBox";
+            this.PollCheckBox.Size = new System.Drawing.Size(43, 17);
+            this.PollCheckBox.TabIndex = 25;
+            this.PollCheckBox.Text = "Poll";
+            this.PollCheckBox.UseVisualStyleBackColor = true;
+            this.PollCheckBox.CheckedChanged += new System.EventHandler(this.PollCheckBox_CheckedChanged);
             // 
             // Form1
             // 
@@ -612,6 +708,7 @@ namespace WinFormTestApp
             this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.Form1_FormClosing);
             this.Load += new System.EventHandler(this.Form1_Load);
             ((System.ComponentModel.ISupportInitialize)(this.dataGridView1)).EndInit();
+            this.contextMenuStrip1.ResumeLayout(false);
             ((System.ComponentModel.ISupportInitialize)(this.chart1)).EndInit();
             this.tabControl1.ResumeLayout(false);
             this.tabPage1.ResumeLayout(false);
@@ -632,7 +729,6 @@ namespace WinFormTestApp
         private System.Windows.Forms.Button buttonGetDataDescriptions;
         private System.Windows.Forms.DataVisualization.Charting.Chart chart1;
         private System.Windows.Forms.Label label1;
-        private System.Windows.Forms.Timer UpdateUITimer;
         private System.Windows.Forms.Button RecordButton;
         private System.Windows.Forms.Button TimelineStopButton;
         private System.Windows.Forms.Button LiveModeButton;
@@ -666,6 +762,15 @@ namespace WinFormTestApp
         private System.Windows.Forms.DataGridViewTextBoxColumn Roll;
         private System.Windows.Forms.Button GetLastFrameOfDataButton;
         private System.Windows.Forms.Button TestButton;
+        private System.Windows.Forms.ContextMenuStrip contextMenuStrip1;
+        private System.Windows.Forms.ToolStripMenuItem menuClear;
+        private System.Windows.Forms.ToolStripMenuItem menuPause;
+        private System.Windows.Forms.Label DroppedFrameCountLabel;
+        private System.Windows.Forms.Label label6;
+        private System.Windows.Forms.CheckBox RecordDataButton;
+        private System.Windows.Forms.Button GetModeButton;
+        private System.Windows.Forms.Button GetTakeRangeButton;
+        private System.Windows.Forms.CheckBox PollCheckBox;
     }
 }
 

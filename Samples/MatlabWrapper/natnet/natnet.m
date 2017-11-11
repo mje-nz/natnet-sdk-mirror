@@ -13,9 +13,10 @@ classdef natnet < handle
 	
 	
 	properties ( SetAccess = private )
-		FrameRate
 		IsConnected
+		Mode
 		Version
+		FrameRate
 	end % properties ( SetAccess = private )
 
 	
@@ -25,7 +26,6 @@ classdef natnet < handle
 		AssemblyVersion
 		Client
 		IsAssemblyLoaded
-		IsInitialized
 		LastAssemblyPathFile
 		MaxListeners
 		Listener
@@ -40,7 +40,7 @@ classdef natnet < handle
 	
 	methods
 		function set.HostIP( obj , val )
-			validIP = checkip( obj , val);
+			validIP = obj.checkip( val);
 			if ( ~isempty( validIP ) )
 				obj.disconnect
 				obj.HostIP = validIP;
@@ -52,7 +52,7 @@ classdef natnet < handle
 		function set.ClientIP( obj , val )
 			validIP = obj.checkip( val );
 			if ( ~isempty( validIP ) )
-				disconnect( obj )
+				obj.disconnect
 				obj.ClientIP = validIP;
 				obj.report( [ 'set client ip address: ' , validIP ] )
 			end
@@ -101,13 +101,14 @@ classdef natnet < handle
 			obj.Listener{ obj.MaxListeners , 1 } = [ ];
 			obj.FrameRate = 0;
 			obj.IsAssemblyLoaded = 0;
-			obj.IsInitialized = 0;
 			obj.IsConnected = 0;
 			obj.IsReporting = 1;
 			obj.CReattempt = 2;
 			obj.HostIP = '127.0.0.1';
 			obj.ClientIP = '127.0.0.1';
 			obj.ConnectionType = 'Multicast';
+			obj.Version = ' ';
+			obj.Mode = ' ';
 		end % natnet - constructor
 		
 		
@@ -147,10 +148,8 @@ classdef natnet < handle
 				report( obj , 'natnetml assembly is missing or undefined' )
 				return
 			end
-			obj.report( 'initializing client' )
 			try
 				obj.Client = NatNetML.NatNetClientML( obj.iConnectionType );
-
 				v = obj.Client.NatNetVersion(  );
 				obj.Version = sprintf( '%d.%d.%d.%d', v( 1 ) , v( 2 ) , v( 3 ) , v( 4 ) );
 				if  ( isempty( obj.Client ) == 1 || obj.IsAssemblyLoaded == 0 )
@@ -159,40 +158,21 @@ classdef natnet < handle
 				else
 					obj.report( [ 'natnet version: ' , obj.Version ] )
 				end
-				flg = obj.Client.Initialize( obj.HostIP , obj.ClientIP );
+				flg = obj.Client.Initialize( obj.ClientIP , obj.HostIP );
 				if flg == 0
-					obj.report( 'initialization succeeded' )
-					obj.IsInitialized = 1;
+					obj.report( 'connection established' )
+					obj.IsConnected = 1;
 				else
-					obj.report( 'initialization failed' )
-					obj.IsInitialized = 0;
+					obj.report( 'connection failed' )
+					obj.IsConnected = 0;
 					return
 				end
 			catch exception
 				rethrow(exception)
 			end
-			obj.verifyConnection
-			obj.getFrameRate;
+			obj.getFrameRate
+			obj.getMode
 		end % connect
-		
-		
-		function verifyConnection( obj )
-			if ( isempty( obj.Client ) == 1 )
-				obj.IsInitialized = 0;
-				obj.IsConnected = 0;
-				obj.report( 'client object is undefined' );
-			else
-				[ ~ , retcode ] = obj.Client.SendMessageAndWait( 'FrameRate' );
-				if( retcode == 0 )
-					obj.IsConnected = 1;
-					report( obj , 'client connected' )
-				else
-					obj.IsConnected = 0;
-					obj.FrameRate = 0;
-					report( obj , 'unable to connect to host' );
-				end
-			end
-		end % verifyConnection
 		
 		
 		function addlistener( obj , aListenerIndex , functionhandlestring )
@@ -363,7 +343,7 @@ classdef natnet < handle
 				return
 			end
 			
-			if obj.IsInitialized == 0
+			if obj.IsConnected == 0
 				return
 			end
 
@@ -377,7 +357,7 @@ classdef natnet < handle
 			else
 				if( isa( obj.Listener{ eListenerIndex , 1 } , 'event.listener' ) ) && obj.Listener{ eListenerIndex , 1 }.Enabled == false
 					obj.Listener{ eListenerIndex , 1 }.Enabled = true;
-					obj.report( [ 'listener disabled in slot: ' , num2str( eListenerIndex ) ] )
+					obj.report( [ 'listener enabled in slot: ' , num2str( eListenerIndex ) ] )
 				end
 			end
 		end % enable
@@ -389,7 +369,7 @@ classdef natnet < handle
 				return
 			end
 			
-			if obj.IsInitialized == 0;
+			if obj.IsConnected == 0;
 				return
 			end
 
@@ -438,7 +418,7 @@ classdef natnet < handle
 						return
 					else
 						obj.report( 'reattempting a failed command' )
-						pause(1)
+						pause(0.2)
 					end
 				end
 				if rc ~= 0
@@ -668,6 +648,37 @@ classdef natnet < handle
 		end % setPlaybackTakeName
 		
 		
+		function getMode( obj )
+			if ( obj.IsConnected == 1 )
+				for i = 1 : obj.CReattempt
+					[ bytearray , rc ] = obj.Client.SendMessageAndWait( 'CurrentMode' );
+					if rc == 0
+						state = bytearray(1);
+						if ( state == 0 )
+							obj.Mode = 'Live';
+						elseif ( state == 1 )
+							obj.Mode = 'Recording';
+						elseif ( state == 2 )
+							obj.Mode = 'Edit';
+						else
+							obj.Mode = ' ';
+						end
+						obj.report( [ 'mode: ' , lower( obj.Mode ) ] )
+						return
+					else
+						obj.report( 'reattempting a failed command' )
+						pause(0.2)
+					end
+				end
+				if rc ~= 0
+					obj.report( ' failed to send command')
+				end
+			else
+				obj.report( 'connection not established' )
+			end
+		end % getServerState
+		
+		
 		function disconnect( obj )
 			obj.disable( 0 );
 			for k = 1 : obj.MaxListeners
@@ -682,7 +693,6 @@ classdef natnet < handle
 				if ( obj.IsConnected == 1 )
 					report( obj , 'disconnecting' );
 				end
-				obj.IsInitialized = 0;
 				obj.IsConnected = 0;
 			end
 		end % disconnect
