@@ -5,6 +5,21 @@ This repository contains each version of NaturalPoint's [NatNet SDK](http://opti
 
 ## Changelog
 
+__3.0.0__ _(September 8, 2017)_
+
+* Added support for streaming of analog data such as NIDAQ data from Motive.
+* NatNet now provides more accurate and detailed methods for determining the latency during different processes in Motive. 
+* Added the ability to remotely configure Motive software settings from NatNet clients.
+* Added an active marker ID property to marker data type to support new active markers over NatNet. Also, included active marker ID information in the rigid body marker descriptions.
+* Reorganized the member methods of the NatNetClient class. Previous methods are still supported for this release; refer to NatNetClient.h for details. 
+* Updated the sample applications, including the WinFormSamples app, to demonstrate the newly added features.
+* Added RebroadcastMotiveData sample for streaming using serial port communication.
+* Now includes pre-built sample applications for both 32-bit and 64-bit applications in the samples/bin directory.
+* Added the ability to automatically discover Multicast/Unicast client. As a result, the ConnectionType Enum has been deprecated.
+* Added an auto-detection feature for finding IP addresses of the available NatNet tracking server, improving the usability of several client applications.
+* Added SampleClientML sample for demonstrating a basic use of the managed library.
+
+
 __2.10.0__ _(June 27, 2016)_
 
 Features & Enhancements

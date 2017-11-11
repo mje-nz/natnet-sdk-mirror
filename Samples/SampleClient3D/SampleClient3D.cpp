@@ -17,7 +17,7 @@
 // NatNetSample.cpp : Defines the entry point for the application.
 //
 #ifdef WIN32
-#  pragma warning( disable : 4996 )
+#  define _CRT_SECURE_NO_WARNINGS
 #  define WIN32_LEAN_AND_MEAN // Exclude rarely-used stuff from Windows headers
 #endif
 
@@ -31,6 +31,7 @@
 
 //NatNet SDK
 #include "NatNetTypes.h"
+#include "NatNetCAPI.h"
 #include "NatNetClient.h"
 #include "natutils.h"
 
@@ -101,9 +102,9 @@ LRESULT CALLBACK NatNetDlgProc(HWND, UINT, WPARAM, LPARAM);
 void RenderOGLScene();
 void Update(HWND hWnd);
 // NatNet
-void DataHandler(sFrameOfMocapData* data, void* pUserData);			// receives data from the server
-void MessageHandler(int msgType, char* msg);		// receives NatNet error mesages
-bool InitNatNet(LPSTR szIPAddress, LPSTR szServerIPAddress);
+void NATNET_CALLCONV DataHandler(sFrameOfMocapData* data, void* pUserData);    // receives data from the server
+void NATNET_CALLCONV MessageHandler(Verbosity msgType, const char* msg);      // receives NatNet error messages
+bool InitNatNet(LPSTR szIPAddress, LPSTR szServerIPAddress, ConnectionType connType);
 bool ParseRigidBodyDescription(sDataDescriptions* pDataDefs);
 
 //****************************************************************************
@@ -341,7 +342,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     {
         HDC hDC = GetDC(hWnd);
         wglMakeCurrent(hDC, openGLRenderContext);
-        natnetClient.Uninitialize();
+        natnetClient.Disconnect();
         wglMakeCurrent(0, 0);
         wglDeleteContext(openGLRenderContext);
         ReleaseDC(hWnd, hDC);
@@ -630,6 +631,9 @@ LRESULT CALLBACK NatNetDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lP
         SetDlgItemText(hDlg, IDC_EDIT6, _itoa(IPAddress[1], szBuf, 10));
         SetDlgItemText(hDlg, IDC_EDIT7, _itoa(IPAddress[2], szBuf, 10));
         SetDlgItemText(hDlg, IDC_EDIT8, _itoa(IPAddress[3], szBuf, 10));
+        SendDlgItemMessage( hDlg, IDC_COMBO_CONNTYPE, CB_ADDSTRING, 0, (LPARAM)TEXT( "Multicast" ) );
+        SendDlgItemMessage( hDlg, IDC_COMBO_CONNTYPE, CB_ADDSTRING, 0, (LPARAM)TEXT( "Unicast" ) );
+        SendDlgItemMessage( hDlg, IDC_COMBO_CONNTYPE, CB_SETCURSEL, 0, 0 );
         return true;
 
     case WM_COMMAND:
@@ -651,10 +655,12 @@ LRESULT CALLBACK NatNetDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lP
             GetDlgItemText(hDlg, IDC_EDIT8, ip4, 4);
             sprintf_s(szServerIPAddress, 30, "%s.%s.%s.%s", ip1, ip2, ip3, ip4);
 
+            const ConnectionType connType = (ConnectionType)SendDlgItemMessage( hDlg, IDC_COMBO_CONNTYPE, CB_GETCURSEL, 0, 0 );
+
             // Try and initialize the NatNet client.
-            if (InitNatNet(szMyIPAddress, szServerIPAddress) == false)
+            if (InitNatNet( szMyIPAddress, szServerIPAddress, connType ) == false)
             {
-                natnetClient.Uninitialize();
+                natnetClient.Disconnect();
                 MessageBox(hDlg, "Failed to connect", "", MB_OK);
             }
         }
@@ -668,20 +674,22 @@ LRESULT CALLBACK NatNetDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lP
 }
 
 // Initialize the NatNet client with client and server IP addresses.
-bool InitNatNet(LPSTR szIPAddress, LPSTR szServerIPAddress)
+bool InitNatNet( LPSTR szIPAddress, LPSTR szServerIPAddress, ConnectionType connType )
 {
     unsigned char ver[4];
-    natnetClient.NatNetVersion(ver);
+    NatNet_GetVersion(ver);
 
     // Set callback handlers
     // Callback for NatNet messages.
-    natnetClient.SetMessageCallback(MessageHandler);
-    // NatNet verbosity level. We want none.
-    natnetClient.SetVerbosityLevel(Verbosity_None);
+    NatNet_SetLogCallback( MessageHandler );
     // this function will receive data from the server
-    natnetClient.SetDataCallback(DataHandler);
+    natnetClient.SetFrameReceivedCallback(DataHandler);
 
-    int retCode = natnetClient.Initialize(szIPAddress, szServerIPAddress);
+    sNatNetClientConnectParams connectParams;
+    connectParams.connectionType = connType;
+    connectParams.localAddress = szIPAddress;
+    connectParams.serverAddress = szServerIPAddress;
+    int retCode = natnetClient.Connect( connectParams );
     if (retCode != ErrorCode_OK)
     {
         //Unable to connect to server.
@@ -702,12 +710,14 @@ bool InitNatNet(LPSTR szIPAddress, LPSTR szServerIPAddress)
 
     // Retrieve RigidBody description from server
     sDataDescriptions* pDataDefs = NULL;
-    int nBodies = natnetClient.GetDataDescriptions(&pDataDefs);
-    if (ParseRigidBodyDescription(pDataDefs) == false)
+    retCode = natnetClient.GetDataDescriptionList(&pDataDefs);
+    if (retCode != ErrorCode_OK || ParseRigidBodyDescription(pDataDefs) == false)
     {
         //Unable to retrieve RigidBody description
         //return false;
     }
+    NatNet_FreeDescriptions( pDataDefs );
+    pDataDefs = NULL;
 
     // example of NatNet general message passing. Set units to millimeters
     // and get the multiplicative conversion factor in the response.
@@ -767,7 +777,7 @@ bool ParseRigidBodyDescription(sDataDescriptions* pDataDefs)
 }
 
 // [Optional] Handler for NatNet messages. 
-void MessageHandler(int msgType, char* msg)
+void NATNET_CALLCONV MessageHandler(Verbosity msgType, const char* msg)
 {
     //	printf("\n[SampleClient] Message received: %s\n", msg);
 }
@@ -800,9 +810,9 @@ void DataHandler(sFrameOfMocapData* data, void* pUserData)
     // timecode
     NatNetClient* pClient = (NatNetClient*)pUserData;
     int hour, minute, second, frame, subframe;
-    bool bValid = pClient->DecodeTimecode(data->Timecode, data->TimecodeSubframe, &hour, &minute, &second, &frame, &subframe);
+    NatNet_DecodeTimecode( data->Timecode, data->TimecodeSubframe, &hour, &minute, &second, &frame, &subframe );
     // decode timecode into friendly string
-    pClient->TimecodeStringify(data->Timecode, data->TimecodeSubframe, szTimecode, 128);
+    NatNet_TimecodeStringify( data->Timecode, data->TimecodeSubframe, szTimecode, 128 );
 
     render = true;
 }

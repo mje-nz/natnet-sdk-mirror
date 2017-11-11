@@ -30,66 +30,165 @@ Usage [optional]:
 
 */
 
+#include <inttypes.h>
+#include <stdlib.h>
 #include <stdio.h>
-#include <tchar.h>
-#include <conio.h>
-#include <winsock2.h>
+#include <string.h>
 
-#include "NatNetTypes.h"
-#include "NatNetClient.h"
+#ifdef _WIN32
+#   include <conio.h>
+#else
+#   include <unistd.h>
+#   include <termios.h>
+#endif
 
-#pragma warning( disable : 4996 )
+#include <vector>
 
+#include <NatNetTypes.h>
+#include <NatNetCAPI.h>
+#include <NatNetClient.h>
+
+#ifndef _WIN32
+char getch();
+#endif
 void _WriteHeader(FILE* fp, sDataDescriptions* pBodyDefs);
 void _WriteFrame(FILE* fp, sFrameOfMocapData* data);
 void _WriteFooter(FILE* fp);
-void __cdecl DataHandler(sFrameOfMocapData* data, void* pUserData);		// receives data from the server
-void __cdecl MessageHandler(int msgType, char* msg);		            // receives NatNet error mesages
+void NATNET_CALLCONV ServerDiscoveredCallback( const sNatNetDiscoveredServer* pDiscoveredServer, void* pUserContext );
+void NATNET_CALLCONV DataHandler(sFrameOfMocapData* data, void* pUserData);    // receives data from the server
+void NATNET_CALLCONV MessageHandler(Verbosity msgType, const char* msg);      // receives NatNet error messages
 void resetClient();
-int CreateClient(int iConnectionType);
+int ConnectClient();
 
-unsigned int MyServersDataPort = 3130;
-unsigned int MyServersCommandPort = 3131;
-int iConnectionType = ConnectionType_Multicast;
-//int iConnectionType = ConnectionType_Unicast;
+static const ConnectionType kDefaultConnectionType = ConnectionType_Multicast;
 
-NatNetClient* theClient;
-FILE* fp;
+NatNetClient* g_pClient = NULL;
+FILE* g_outputFile;
 
-char szMyIPAddress[128] = "";
-char szServerIPAddress[128] = "";
+std::vector< sNatNetDiscoveredServer > g_discoveredServers;
+sNatNetClientConnectParams g_connectParams;
+char g_discoveredMulticastGroupAddr[kNatNetIpv4AddrStrLenMax] = NATNET_DEFAULT_MULTICAST_ADDRESS;
+int g_analogSamplesPerMocapFrame = 0;
+sServerDescription g_serverDescription;
 
-int analogSamplesPerMocapFrame = 0;
 
-int _tmain(int argc, _TCHAR* argv[])
+int main( int argc, char* argv[] )
 {
+    // print version info
+    unsigned char ver[4];
+    NatNet_GetVersion( ver );
+    printf( "NatNet Sample Client (NatNet ver. %d.%d.%d.%d)\n", ver[0], ver[1], ver[2], ver[3] );
+
+    // Install logging callback
+    NatNet_SetLogCallback( MessageHandler );
+
+    // create NatNet client
+    g_pClient = new NatNetClient();
+
+    // set the frame callback handler
+    g_pClient->SetFrameReceivedCallback( DataHandler, g_pClient );	// this function will receive data from the server
+
+    // If no arguments were specified on the command line,
+    // attempt to discover servers on the local network.
+    if ( argc == 1 )
+    {
+        // An example of synchronous server discovery.
+#if 0
+        const unsigned int kDiscoveryWaitTimeMillisec = 5 * 1000; // Wait 5 seconds for responses.
+        const int kMaxDescriptions = 10; // Get info for, at most, the first 10 servers to respond.
+        sNatNetDiscoveredServer servers[kMaxDescriptions];
+        int actualNumDescriptions = kMaxDescriptions;
+        NatNet_BroadcastServerDiscovery( servers, &actualNumDescriptions );
+
+        if ( actualNumDescriptions < kMaxDescriptions )
+        {
+            // If this happens, more servers responded than the array was able to store.
+        }
+#endif
+
+        // Do asynchronous server discovery.
+        printf( "Looking for servers on the local network.\n" );
+        printf( "Press the number key that corresponds to any discovered server to connect to that server.\n" );
+        printf( "Press Q at any time to quit.\n\n" );
+
+        NatNetDiscoveryHandle discovery;
+        NatNet_CreateAsyncServerDiscovery( &discovery, ServerDiscoveredCallback );
+
+        while ( const int c = getch() )
+        {
+            if ( c >= '1' && c <= '9' )
+            {
+                const size_t serverIndex = c - '1';
+                if ( serverIndex < g_discoveredServers.size() )
+                {
+                    const sNatNetDiscoveredServer& discoveredServer = g_discoveredServers[serverIndex];
+
+                    if ( discoveredServer.serverDescription.bConnectionInfoValid )
+                    {
+                        // Build the connection parameters.
+#ifdef _WIN32
+                        _snprintf_s(
+#else
+                        snprintf(
+#endif
+                            g_discoveredMulticastGroupAddr, sizeof g_discoveredMulticastGroupAddr,
+                            "%"PRIu8".%"PRIu8".%"PRIu8".%"PRIu8"",
+                            discoveredServer.serverDescription.ConnectionMulticastAddress[0],
+                            discoveredServer.serverDescription.ConnectionMulticastAddress[1],
+                            discoveredServer.serverDescription.ConnectionMulticastAddress[2],
+                            discoveredServer.serverDescription.ConnectionMulticastAddress[3]
+                        );
+
+                        g_connectParams.connectionType = discoveredServer.serverDescription.ConnectionMulticast ? ConnectionType_Multicast : ConnectionType_Unicast;
+                        g_connectParams.serverCommandPort = discoveredServer.serverCommandPort;
+                        g_connectParams.serverDataPort = discoveredServer.serverDescription.ConnectionDataPort;
+                        g_connectParams.serverAddress = discoveredServer.serverAddress;
+                        g_connectParams.localAddress = discoveredServer.localAddress;
+                        g_connectParams.multicastAddress = g_discoveredMulticastGroupAddr;
+                    }
+                    else
+                    {
+                        // We're missing some info because it's a legacy server.
+                        // Guess the defaults and make a best effort attempt to connect.
+                        g_connectParams.connectionType = kDefaultConnectionType;
+                        g_connectParams.serverCommandPort = discoveredServer.serverCommandPort;
+                        g_connectParams.serverDataPort = 0;
+                        g_connectParams.serverAddress = discoveredServer.serverAddress;
+                        g_connectParams.localAddress = discoveredServer.localAddress;
+                        g_connectParams.multicastAddress = NULL;
+                    }
+
+                    break;
+                }
+            }
+            else if ( c == 'q' )
+            {
+                return 0;
+            }
+        }
+
+        NatNet_FreeAsyncServerDiscovery( discovery );
+    }
+    else
+    {
+        g_connectParams.connectionType = kDefaultConnectionType;
+
+        if ( argc >= 2 )
+        {
+            g_connectParams.serverAddress = argv[1];
+        }
+
+        if ( argc >= 3 )
+        {
+            g_connectParams.localAddress = argv[2];
+        }
+    }
+
     int iResult;
-     
-    // parse command line args
-    if(argc>1)
-    {
-        strcpy(szServerIPAddress, argv[1]);	// specified on command line
-        printf("Connecting to server at %s...\n", szServerIPAddress);
-    }
-    else
-    {
-        strcpy(szServerIPAddress, "");		// not specified - assume server is local machine
-        printf("Connecting to server at LocalMachine\n");
-    }
-    if(argc>2)
-    {
-        strcpy(szMyIPAddress, argv[2]);	    // specified on command line
-        printf("Connecting from %s...\n", szMyIPAddress);
-    }
-    else
-    {
-        strcpy(szMyIPAddress, "");          // not specified - assume server is local machine
-        printf("Connecting from LocalMachine...\n");
-    }
 
     // Create NatNet Client
-    iResult = CreateClient(iConnectionType);
-    if(iResult != ErrorCode_OK)
+    iResult = ConnectClient();
+    if (iResult != ErrorCode_OK)
     {
         printf("Error initializing client.  See log for details.  Exiting");
         return 1;
@@ -99,12 +198,12 @@ int _tmain(int argc, _TCHAR* argv[])
         printf("Client initialized and ready.\n");
     }
 
+	void* response;
+	int nBytes;
 
 	// send/receive test request
 	printf("[SampleClient] Sending Test Request\n");
-	void* response;
-	int nBytes;
-	iResult = theClient->SendMessageAndWait("TestRequest", &response, &nBytes);
+	iResult = g_pClient->SendMessageAndWait("TestRequest", &response, &nBytes);
 	if (iResult == ErrorCode_OK)
 	{
 		printf("[SampleClient] Received: %s", (char*)response);
@@ -113,8 +212,8 @@ int _tmain(int argc, _TCHAR* argv[])
 	// Retrieve Data Descriptions from server
 	printf("\n\n[SampleClient] Requesting Data Descriptions...");
 	sDataDescriptions* pDataDefs = NULL;
-	int nBodies = theClient->GetDataDescriptions(&pDataDefs);
-	if(!pDataDefs)
+	iResult = g_pClient->GetDataDescriptionList(&pDataDefs);
+	if (iResult != ErrorCode_OK || pDataDefs == NULL)
 	{
 		printf("[SampleClient] Unable to retrieve Data Descriptions.");
 	}
@@ -141,6 +240,23 @@ int _tmain(int argc, _TCHAR* argv[])
                 printf("RigidBody ID : %d\n", pRB->ID);
                 printf("RigidBody Parent ID : %d\n", pRB->parentID);
                 printf("Parent Offset : %3.2f,%3.2f,%3.2f\n", pRB->offsetx, pRB->offsety, pRB->offsetz);
+
+                if ( pRB->MarkerPositions != NULL && pRB->MarkerRequiredLabels != NULL )
+                {
+                    for ( int markerIdx = 0; markerIdx < pRB->nMarkers; ++markerIdx )
+                    {
+                        const MarkerData& markerPosition = pRB->MarkerPositions[markerIdx];
+                        const int markerRequiredLabel = pRB->MarkerRequiredLabels[markerIdx];
+
+                        printf( "\tMarker #%d:\n", markerIdx );
+                        printf( "\t\tPosition: %.2f, %.2f, %.2f\n", markerPosition[0], markerPosition[1], markerPosition[2] );
+
+                        if ( markerRequiredLabel != 0 )
+                        {
+                            printf( "\t\tRequired active label: %d\n", markerRequiredLabel );
+                        }
+                    }
+                }
             }
             else if(pDataDefs->arrDataDescriptions[i].type == Descriptor_Skeleton)
             {
@@ -175,6 +291,17 @@ int _tmain(int argc, _TCHAR* argv[])
                 for(int iChannel=0; iChannel<pFP->nChannels; iChannel++)
                     printf("\tChannel %d : %s\n", iChannel, pFP->szChannelNames[iChannel]);
             }
+            else if (pDataDefs->arrDataDescriptions[i].type == Descriptor_Device)
+            {
+                // Peripheral Device
+                sDeviceDescription* pDevice = pDataDefs->arrDataDescriptions[i].Data.DeviceDescription;
+                printf("Device Name : %s\n", pDevice->strName);
+                printf("Device Serial : %s\n", pDevice->strSerialNo);
+                printf("Device ID : %d\n", pDevice->ID);
+                printf("Device Channel Count : %d\n", pDevice->nChannels);
+                for (int iChannel = 0; iChannel < pDevice->nChannels; iChannel++)
+                    printf("\tChannel %d : %s\n", iChannel, pDevice->szChannelNames[iChannel]);
+            }
             else
             {
                 printf("Unknown data type.");
@@ -185,27 +312,29 @@ int _tmain(int argc, _TCHAR* argv[])
 
 	
 	// Create data file for writing received stream into
-	char szFile[MAX_PATH];
-	char szFolder[MAX_PATH];
-	GetCurrentDirectory(MAX_PATH, szFolder);
-	if(argc > 3)
-		sprintf(szFile, "%s\\%s", szFolder, argv[3]);
-	else
-		sprintf(szFile, "%s\\Client-output.pts",szFolder);
-	fp = fopen(szFile, "w");
-	if(!fp)
+	const char* szFile = "Client-output.pts";
+	if (argc > 3)
+		szFile = argv[3];
+
+	g_outputFile = fopen(szFile, "w");
+	if(!g_outputFile)
 	{
 		printf("error opening output file %s.  Exiting.", szFile);
 		exit(1);
 	}
-	if(pDataDefs)
-		_WriteHeader(fp, pDataDefs);
+
+    if ( pDataDefs )
+    {
+        _WriteHeader( g_outputFile, pDataDefs );
+        NatNet_FreeDescriptions( pDataDefs );
+        pDataDefs = NULL;
+    }
 
 	// Ready to receive marker stream!
 	printf("\nClient is connected to server and listening for data...\n");
 	int c;
 	bool bExit = false;
-	while(c =_getch())
+	while(c=getch())
 	{
 		switch(c)
 		{
@@ -218,41 +347,50 @@ int _tmain(int argc, _TCHAR* argv[])
             case 'p':
                 sServerDescription ServerDescription;
                 memset(&ServerDescription, 0, sizeof(ServerDescription));
-                theClient->GetServerDescription(&ServerDescription);
+                g_pClient->GetServerDescription(&ServerDescription);
                 if(!ServerDescription.HostPresent)
                 {
                     printf("Unable to connect to server. Host not present. Exiting.");
                     return 1;
                 }
-                break;	
-            case 'f':
+                break;
+            case 's':
                 {
-                    sFrameOfMocapData* pData = theClient->GetLastFrameOfData();
-                    printf("Most Recent Frame: %d", pData->iFrame);
+                printf("\n\n[SampleClient] Requesting Data Descriptions...");
+                sDataDescriptions* pDataDefs = NULL;
+                iResult = g_pClient->GetDataDescriptionList(&pDataDefs);
+                if (iResult != ErrorCode_OK || pDataDefs == NULL)
+                {
+                    printf("[SampleClient] Unable to retrieve Data Descriptions.");
                 }
-                break;	
+                else
+                {
+                    printf("[SampleClient] Received %d Data Descriptions:\n", pDataDefs->nDataDescriptions);
+                }
+                }
+                break;
             case 'm':	                        // change to multicast
-                iConnectionType = ConnectionType_Multicast;
-                iResult = CreateClient(iConnectionType);
+                g_connectParams.connectionType = ConnectionType_Multicast;
+                iResult = ConnectClient();
                 if(iResult == ErrorCode_OK)
                     printf("Client connection type changed to Multicast.\n\n");
                 else
                     printf("Error changing client connection type to Multicast.\n\n");
                 break;
             case 'u':	                        // change to unicast
-                iConnectionType = ConnectionType_Unicast;
-                iResult = CreateClient(iConnectionType);
+                g_connectParams.connectionType = ConnectionType_Unicast;
+                iResult = ConnectClient();
                 if(iResult == ErrorCode_OK)
                     printf("Client connection type changed to Unicast.\n\n");
                 else
                     printf("Error changing client connection type to Unicast.\n\n");
                 break;
             case 'c' :                          // connect
-                iResult = CreateClient(iConnectionType);
+                iResult = ConnectClient();
                 break;
             case 'd' :                          // disconnect
                 // note: applies to unicast connections only - indicates to Motive to stop sending packets to that client endpoint
-                iResult = theClient->SendMessageAndWait("Disconnect", &response, &nBytes);
+                iResult = g_pClient->SendMessageAndWait("Disconnect", &response, &nBytes);
                 if (iResult == ErrorCode_OK)
                     printf("[SampleClient] Disconnected");
                 break;
@@ -264,45 +402,60 @@ int _tmain(int argc, _TCHAR* argv[])
 	}
 
 	// Done - clean up.
-	theClient->Uninitialize();
-	_WriteFooter(fp);
-	fclose(fp);
+	if (g_pClient)
+	{
+		g_pClient->Disconnect();
+		delete g_pClient;
+		g_pClient = NULL;
+	}
+
+	if (g_outputFile)
+	{
+		_WriteFooter(g_outputFile);
+		fclose(g_outputFile);
+		g_outputFile = NULL;
+	}
 
 	return ErrorCode_OK;
 }
 
-// Establish a NatNet Client connection
-int CreateClient(int iConnectionType)
+
+void NATNET_CALLCONV ServerDiscoveredCallback( const sNatNetDiscoveredServer* pDiscoveredServer, void* pUserContext )
 {
-    // release previous server
-    if(theClient)
+    char serverHotkey = '.';
+    if ( g_discoveredServers.size() < 9 )
     {
-        theClient->Uninitialize();
-        delete theClient;
+        serverHotkey = static_cast<char>('1' + g_discoveredServers.size());
     }
 
-    // create NatNet client
-    theClient = new NatNetClient(iConnectionType);
+    const char* warning = "";
 
+    if ( pDiscoveredServer->serverDescription.bConnectionInfoValid == false )
+    {
+        warning = " (WARNING: Legacy server, could not autodetect settings. Auto-connect may not work reliably.)";
+    }
 
+    printf( "[%c] %s %d.%d at %s%s\n",
+        serverHotkey,
+        pDiscoveredServer->serverDescription.szHostApp,
+        pDiscoveredServer->serverDescription.HostAppVersion[0],
+        pDiscoveredServer->serverDescription.HostAppVersion[1],
+        pDiscoveredServer->serverAddress,
+        warning );
 
-    // set the callback handlers
-    theClient->SetVerbosityLevel(Verbosity_Warning);
-    theClient->SetMessageCallback(MessageHandler);
-    theClient->SetDataCallback( DataHandler, theClient );	// this function will receive data from the server
-    // [optional] use old multicast group
-    //theClient->SetMulticastAddress("224.0.0.1");
+    g_discoveredServers.push_back( *pDiscoveredServer );
+}
 
-    // print version info
-    unsigned char ver[4];
-    theClient->NatNetVersion(ver);
-    printf("NatNet Sample Client (NatNet ver. %d.%d.%d.%d)\n", ver[0], ver[1], ver[2], ver[3]);
+// Establish a NatNet Client connection
+int ConnectClient()
+{
+    // release previous server
+    g_pClient->Disconnect();
 
     // Init Client and connect to NatNet server
     // to use NatNet default port assignments
-    int retCode = theClient->Initialize(szMyIPAddress, szServerIPAddress);
+    int retCode = g_pClient->Connect( g_connectParams );
     // to use a different port for commands and/or data:
-    //int retCode = theClient->Initialize(szMyIPAddress, szServerIPAddress, MyServersCommandPort, MyServersDataPort);
     if (retCode != ErrorCode_OK)
     {
         printf("Unable to connect to server.  Error code: %d. Exiting", retCode);
@@ -310,54 +463,109 @@ int CreateClient(int iConnectionType)
     }
     else
     {
-        // get # of analog samples per mocap frame of data
         void* pResult;
-        int ret = 0;
         int nBytes = 0;
-        ret = theClient->SendMessageAndWait("AnalogSamplesPerMocapFrame", &pResult, &nBytes);
-        if (ret == ErrorCode_OK)
-        {
-            analogSamplesPerMocapFrame = *((int*)pResult);
-            printf("Analog Samples Per Mocap Frame : %d", analogSamplesPerMocapFrame);
-        }
+        ErrorCode ret = ErrorCode_OK;
 
         // print server info
-        sServerDescription ServerDescription;
-        memset(&ServerDescription, 0, sizeof(ServerDescription));
-        theClient->GetServerDescription(&ServerDescription);
-        if(!ServerDescription.HostPresent)
+        memset( &g_serverDescription, 0, sizeof( g_serverDescription ) );
+        ret = g_pClient->GetServerDescription( &g_serverDescription );
+        if ( ret != ErrorCode_OK || ! g_serverDescription.HostPresent )
         {
             printf("Unable to connect to server. Host not present. Exiting.");
             return 1;
         }
-        printf("[SampleClient] Server application info:\n");
-        printf("Application: %s (ver. %d.%d.%d.%d)\n", ServerDescription.szHostApp, ServerDescription.HostAppVersion[0],
-            ServerDescription.HostAppVersion[1],ServerDescription.HostAppVersion[2],ServerDescription.HostAppVersion[3]);
-        printf("NatNet Version: %d.%d.%d.%d\n", ServerDescription.NatNetVersion[0], ServerDescription.NatNetVersion[1],
-            ServerDescription.NatNetVersion[2], ServerDescription.NatNetVersion[3]);
-        printf("Client IP:%s\n", szMyIPAddress);
-        printf("Server IP:%s\n", szServerIPAddress);
-        printf("Server Name:%s\n\n", ServerDescription.szHostComputerName);
+        printf("\n[SampleClient] Server application info:\n");
+        printf("Application: %s (ver. %d.%d.%d.%d)\n", g_serverDescription.szHostApp, g_serverDescription.HostAppVersion[0],
+            g_serverDescription.HostAppVersion[1], g_serverDescription.HostAppVersion[2], g_serverDescription.HostAppVersion[3]);
+        printf("NatNet Version: %d.%d.%d.%d\n", g_serverDescription.NatNetVersion[0], g_serverDescription.NatNetVersion[1],
+            g_serverDescription.NatNetVersion[2], g_serverDescription.NatNetVersion[3]);
+        printf("Client IP:%s\n", g_connectParams.localAddress );
+        printf("Server IP:%s\n", g_connectParams.serverAddress );
+        printf("Server Name:%s\n", g_serverDescription.szHostComputerName);
+
+        // get mocap frame rate
+        ret = g_pClient->SendMessageAndWait("FrameRate", &pResult, &nBytes);
+        if (ret == ErrorCode_OK)
+        {
+            float fRate = *((float*)pResult);
+            printf("Mocap Framerate : %3.2f\n", fRate);
+        }
+        else
+            printf("Error getting frame rate.\n");
+
+        // get # of analog samples per mocap frame of data
+        ret = g_pClient->SendMessageAndWait("AnalogSamplesPerMocapFrame", &pResult, &nBytes);
+        if (ret == ErrorCode_OK)
+        {
+            g_analogSamplesPerMocapFrame = *((int*)pResult);
+            printf("Analog Samples Per Mocap Frame : %d\n", g_analogSamplesPerMocapFrame);
+        }
+        else
+            printf("Error getting Analog frame rate.\n");
     }
 
     return ErrorCode_OK;
-
 }
 
 // DataHandler receives data from the server
-void __cdecl DataHandler(sFrameOfMocapData* data, void* pUserData)
+void NATNET_CALLCONV DataHandler(sFrameOfMocapData* data, void* pUserData)
 {
-	NatNetClient* pClient = (NatNetClient*) pUserData;
+    NatNetClient* pClient = (NatNetClient*) pUserData;
 
-	if(fp)
-		_WriteFrame(fp,data);
-	
+    // Software latency here is defined as the span of time between:
+    //   a) The reception of a complete group of 2D frames from the camera system (CameraDataReceivedTimestamp)
+    // and
+    //   b) The time immediately prior to the NatNet frame being transmitted over the network (TransmitTimestamp)
+    //
+    // This figure may appear slightly higher than the "software latency" reported in the Motive user interface,
+    // because it additionally includes the time spent preparing to stream the data via NatNet.
+    const uint64_t softwareLatencyHostTicks = data->TransmitTimestamp - data->CameraDataReceivedTimestamp;
+    const double softwareLatencyMillisec = (softwareLatencyHostTicks * 1000) / static_cast<double>(g_serverDescription.HighResClockFrequency);
+
+    // Transit latency is defined as the span of time between Motive transmitting the frame of data, and its reception by the client (now).
+    // The SecondsSinceHostTimestamp method relies on NatNetClient's internal clock synchronization with the server using Cristian's algorithm.
+    const double transitLatencyMillisec = pClient->SecondsSinceHostTimestamp( data->TransmitTimestamp ) * 1000.0;
+
+    if (g_outputFile)
+    {
+        _WriteFrame( g_outputFile, data );
+    }
+
     int i=0;
 
     printf("FrameID : %d\n", data->iFrame);
-    printf("Timestamp :  %3.2lf\n", data->fTimestamp);
-    printf("Latency :  %3.2lf\n", data->fLatency);
-    
+    printf("Timestamp : %3.2lf\n", data->fTimestamp);
+    printf("Software latency : %.2lf milliseconds\n", softwareLatencyMillisec);
+
+    // Only recent versions of the Motive software in combination with ethernet camera systems support system latency measurement.
+    // If it's unavailable (for example, with USB camera systems, or during playback), this field will be zero.
+    const bool bSystemLatencyAvailable = data->CameraMidExposureTimestamp != 0;
+
+    if ( bSystemLatencyAvailable )
+    {
+        // System latency here is defined as the span of time between:
+        //   a) The midpoint of the camera exposure window, and therefore the average age of the photons (CameraMidExposureTimestamp)
+        // and
+        //   b) The time immediately prior to the NatNet frame being transmitted over the network (TransmitTimestamp)
+        const uint64_t systemLatencyHostTicks = data->TransmitTimestamp - data->CameraMidExposureTimestamp;
+        const double systemLatencyMillisec = (systemLatencyHostTicks * 1000) / static_cast<double>(g_serverDescription.HighResClockFrequency);
+
+        // Client latency is defined as the sum of system latency and the transit time taken to relay the data to the NatNet client.
+        // This is the all-inclusive measurement (photons to client processing).
+        const double clientLatencyMillisec = pClient->SecondsSinceHostTimestamp( data->CameraMidExposureTimestamp ) * 1000.0;
+
+        // You could equivalently do the following (not accounting for time elapsed since we calculated transit latency above):
+        //const double clientLatencyMillisec = systemLatencyMillisec + transitLatencyMillisec;
+
+        printf( "System latency : %.2lf milliseconds\n", systemLatencyMillisec );
+        printf( "Total client latency : %.2lf milliseconds (transit time +%.2lf ms)\n", clientLatencyMillisec, transitLatencyMillisec );
+    }
+    else
+    {
+        printf( "Transit latency : %.2lf milliseconds\n", transitLatencyMillisec );
+    }
+
     // FrameOfMocapData params
     bool bIsRecording = ((data->params & 0x01)!=0);
     bool bTrackedModelsChanged = ((data->params & 0x02)!=0);
@@ -366,13 +574,13 @@ void __cdecl DataHandler(sFrameOfMocapData* data, void* pUserData)
     if(bTrackedModelsChanged)
         printf("Models Changed.\n");
 	
-        
+
     // timecode - for systems with an eSync and SMPTE timecode generator - decode to values
 	int hour, minute, second, frame, subframe;
-	bool bValid = pClient->DecodeTimecode(data->Timecode, data->TimecodeSubframe, &hour, &minute, &second, &frame, &subframe);
+    NatNet_DecodeTimecode( data->Timecode, data->TimecodeSubframe, &hour, &minute, &second, &frame, &subframe );
 	// decode to friendly string
 	char szTimecode[128] = "";
-	pClient->TimecodeStringify(data->Timecode, data->TimecodeSubframe, szTimecode, 128);
+    NatNet_TimecodeStringify( data->Timecode, data->TimecodeSubframe, szTimecode, 128 );
 	printf("Timecode : %s\n", szTimecode);
 
 	// Other Markers
@@ -404,21 +612,6 @@ void __cdecl DataHandler(sFrameOfMocapData* data, void* pUserData)
 			data->RigidBodies[i].qy,
 			data->RigidBodies[i].qz,
 			data->RigidBodies[i].qw);
-
-		printf("\tRigid body markers [Count=%d]\n", data->RigidBodies[i].nMarkers);
-		for(int iMarker=0; iMarker < data->RigidBodies[i].nMarkers; iMarker++)
-		{
-            printf("\t\t");
-            if(data->RigidBodies[i].MarkerIDs)
-                printf("MarkerID:%d", data->RigidBodies[i].MarkerIDs[iMarker]);
-            if(data->RigidBodies[i].MarkerSizes)
-                printf("\tMarkerSize:%3.2f", data->RigidBodies[i].MarkerSizes[iMarker]);
-            if(data->RigidBodies[i].Markers)
-                printf("\tMarkerPos:%3.2f,%3.2f,%3.2f\n" ,
-                    data->RigidBodies[i].Markers[iMarker][0],
-                    data->RigidBodies[i].Markers[iMarker][1],
-                    data->RigidBodies[i].Markers[iMarker][2]);
-        }
 	}
 
 	// skeletons
@@ -432,21 +625,6 @@ void __cdecl DataHandler(sFrameOfMocapData* data, void* pUserData)
 			sRigidBodyData rbData = skData.RigidBodyData[j];
 			printf("Bone %d\t%3.2f\t%3.2f\t%3.2f\t%3.2f\t%3.2f\t%3.2f\t%3.2f\n",
 				rbData.ID, rbData.x, rbData.y, rbData.z, rbData.qx, rbData.qy, rbData.qz, rbData.qw );
-
-			printf("\tRigid body markers [Count=%d]\n", rbData.nMarkers);
-			for(int iMarker=0; iMarker < rbData.nMarkers; iMarker++)
-			{
-				printf("\t\t");
-				if(rbData.MarkerIDs)
-					printf("MarkerID:%d", rbData.MarkerIDs[iMarker]);
-				if(rbData.MarkerSizes)
-					printf("\tMarkerSize:%3.2f", rbData.MarkerSizes[iMarker]);
-				if(rbData.Markers)
-					printf("\tMarkerPos:%3.2f,%3.2f,%3.2f\n" ,
-					data->RigidBodies[i].Markers[iMarker][0],
-					data->RigidBodies[i].Markers[iMarker][1],
-					data->RigidBodies[i].Markers[iMarker][2]);
-			}
 		}
 	}
 
@@ -462,16 +640,12 @@ void __cdecl DataHandler(sFrameOfMocapData* data, void* pUserData)
         bModelSolved = ((data->LabeledMarkers[i].params & 0x04)!=0);
 		sMarker marker = data->LabeledMarkers[i];
         int modelID, markerID;
-        theClient->DecodeID(marker.ID, &modelID, &markerID);
+        NatNet_DecodeID( marker.ID, &modelID, &markerID );
 		printf("Labeled Marker [ModelID=%d, MarkerID=%d, Occluded=%d, PCSolved=%d, ModelSolved=%d] [size=%3.2f] [pos=%3.2f,%3.2f,%3.2f]\n",
             modelID, markerID, bOccluded, bPCSolved, bModelSolved,  marker.size, marker.x, marker.y, marker.z);
 	}
 
     // force plates
-    if(data->nForcePlates==0)
-    {
-        printf("No Plates\n");
-    }
     printf("Force Plate [Count=%d]\n", data->nForcePlates);
     for(int iPlate=0; iPlate < data->nForcePlates; iPlate++)
     {
@@ -483,9 +657,9 @@ void __cdecl DataHandler(sFrameOfMocapData* data, void* pUserData)
             {
                 printf("\tEmpty Frame\n");
             }
-            else if(data->ForcePlates[iPlate].ChannelData[iChannel].nFrames != analogSamplesPerMocapFrame)
+            else if(data->ForcePlates[iPlate].ChannelData[iChannel].nFrames != g_analogSamplesPerMocapFrame)
             {
-                printf("\tPartial Frame [Expected:%d   Actual:%d]\n", analogSamplesPerMocapFrame, data->ForcePlates[iPlate].ChannelData[iChannel].nFrames);
+                printf("\tPartial Frame [Expected:%d   Actual:%d]\n", g_analogSamplesPerMocapFrame, data->ForcePlates[iPlate].ChannelData[iChannel].nFrames);
             }
             for(int iSample=0; iSample < data->ForcePlates[iPlate].ChannelData[iChannel].nFrames; iSample++)
                 printf("%3.2f\t", data->ForcePlates[iPlate].ChannelData[iChannel].Values[iSample]);
@@ -493,13 +667,63 @@ void __cdecl DataHandler(sFrameOfMocapData* data, void* pUserData)
         }
     }
 
+    // devices
+    printf("Device [Count=%d]\n", data->nDevices);
+    for (int iDevice = 0; iDevice < data->nDevices; iDevice++)
+    {
+        printf("Device %d\n", data->Devices[iDevice].ID);
+        for (int iChannel = 0; iChannel < data->Devices[iDevice].nChannels; iChannel++)
+        {
+            printf("\tChannel %d:\t", iChannel);
+            if (data->Devices[iDevice].ChannelData[iChannel].nFrames == 0)
+            {
+                printf("\tEmpty Frame\n");
+            }
+            else if (data->Devices[iDevice].ChannelData[iChannel].nFrames != g_analogSamplesPerMocapFrame)
+            {
+                printf("\tPartial Frame [Expected:%d   Actual:%d]\n", g_analogSamplesPerMocapFrame, data->Devices[iDevice].ChannelData[iChannel].nFrames);
+            }
+            for (int iSample = 0; iSample < data->Devices[iDevice].ChannelData[iChannel].nFrames; iSample++)
+                printf("%3.2f\t", data->Devices[iDevice].ChannelData[iChannel].Values[iSample]);
+            printf("\n");
+        }
+    }
 }
 
+
 // MessageHandler receives NatNet error/debug messages
-void __cdecl MessageHandler(int msgType, char* msg)
+void NATNET_CALLCONV MessageHandler( Verbosity msgType, const char* msg )
 {
-	printf("\n%s\n", msg);
+    // Optional: Filter out debug messages
+    if ( msgType < Verbosity_Info )
+    {
+        return;
+    }
+
+    printf( "\n[NatNetLib]" );
+
+    switch ( msgType )
+    {
+        case Verbosity_Debug:
+            printf( " [DEBUG]" );
+            break;
+        case Verbosity_Info:
+            printf( "  [INFO]" );
+            break;
+        case Verbosity_Warning:
+            printf( "  [WARN]" );
+            break;
+        case Verbosity_Error:
+            printf( " [ERROR]" );
+            break;
+        default:
+            printf( " [?????]" );
+            break;
+    }
+
+    printf( ": %s\n", msg );
 }
+
 
 /* File writing routines */
 void _WriteHeader(FILE* fp, sDataDescriptions* pBodyDefs)
@@ -531,6 +755,7 @@ void _WriteHeader(FILE* fp, sDataDescriptions* pBodyDefs)
 
 }
 
+
 void _WriteFrame(FILE* fp, sFrameOfMocapData* data)
 {
 	fprintf(fp, "%d", data->iFrame);
@@ -541,11 +766,13 @@ void _WriteFrame(FILE* fp, sFrameOfMocapData* data)
 	fprintf(fp, "\n");
 }
 
+
 void _WriteFooter(FILE* fp)
 {
 	fprintf(fp, "</Data>\n\n");
 	fprintf(fp, "</MarkerSet>\n");
 }
+
 
 void resetClient()
 {
@@ -553,14 +780,46 @@ void resetClient()
 
 	printf("\n\nre-setting Client\n\n.");
 
-	iSuccess = theClient->Uninitialize();
+	iSuccess = g_pClient->Disconnect();
 	if(iSuccess != 0)
 		printf("error un-initting Client\n");
 
-	iSuccess = theClient->Initialize(szMyIPAddress, szServerIPAddress);
+    iSuccess = g_pClient->Connect( g_connectParams );
 	if(iSuccess != 0)
 		printf("error re-initting Client\n");
-
-
 }
 
+
+#ifndef _WIN32
+char getch()
+{
+    char buf = 0;
+    termios old = { 0 };
+
+    fflush( stdout );
+
+    if ( tcgetattr( 0, &old ) < 0 )
+        perror( "tcsetattr()" );
+
+    old.c_lflag &= ~ICANON;
+    old.c_lflag &= ~ECHO;
+    old.c_cc[VMIN] = 1;
+    old.c_cc[VTIME] = 0;
+
+    if ( tcsetattr( 0, TCSANOW, &old ) < 0 )
+        perror( "tcsetattr ICANON" );
+
+    if ( read( 0, &buf, 1 ) < 0 )
+        perror( "read()" );
+
+    old.c_lflag |= ICANON;
+    old.c_lflag |= ECHO;
+
+    if ( tcsetattr( 0, TCSADRAIN, &old ) < 0 )
+        perror( "tcsetattr ~ICANON" );
+
+    //printf( "%c\n", buf );
+
+    return buf;
+}
+#endif

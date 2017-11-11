@@ -8,6 +8,15 @@ Please refer to the NatNet API USer's Guide for more information.
 
 Change Log
 -----------
+Version 3.0.0 (Motive 2.0)
+---------------------
+* Note to Direct Depackatization Clients : Bitstream syntax change in Motive 2.0 (NatNet v3.0.0).  Please see PacketClient.cpp for example.
+
+Added: Motive Peripheral Device data descriptions and data streaming (e.g. NIDAQ) (See WinForms example)
+
+Added: New command (SetProperty) to remotely set Motive settings from client (See WinForms example)
+
+
 Version 2.10.0 (06/15/2016)
 -----------------------
 

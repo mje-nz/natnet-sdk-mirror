@@ -26,6 +26,8 @@ classdef quaternion
 %                               x3(i1,i2,...);x4(i1,i2,...)]
 %
 % Quaternion array constructor methods:
+%  q  = quaternion.complexmatrix(Q)
+%                               construct quaternions from complex 2x2 matrices
 %  q  = quaternion.eye(N)       quaternion NxN identity matrix
 %  q  = quaternion.nan(siz)     q(:).e = [NaN;NaN;NaN;NaN]
 %  q  = quaternion.ones(siz)    q(:).e = [1;0;0;0]
@@ -50,6 +52,13 @@ classdef quaternion
 %                               Euler angles in radians, q is size
 %                               [s1,s2,...], quaternions normalized to 1
 %                               equivalent to Euler Angle rotations
+%  q  = quaternion.integrateomega(t,w,odeoptions) or
+%  q  = quaternion.integrateomega(t,omega,axis,odeoptions)
+%                               integrate angular velocities over time
+%  q  = quaternion.modifiedrodrigues(mrp)
+%                               quaternions from Modified Rodrigues parameters
+%  q  = quaternion.rodrigues(rp)
+%                               quaternions from Rodrigues parameters
 %  q  = quaternion.rotateutov(u,v,dimu,dimv)
 %                               quaternions normalized to 1 that rotate 3
 %                               element vectors u into the directions of 3
@@ -64,9 +73,13 @@ classdef quaternion
 %  [angle,axis] = AngleAxis(q)  angles in radians, unit vector rotation axes
 %                               equivalent to q
 %  qd = Derivative(q,w)         quaternion derivatives, w are 3 component
-%                               angular velocity vectors
+%                               angular velocity vectors, qd = 0.5*q*quaternion(w)
 %  angles = EulerAngles(q,axes) angles are 3 Euler angles equivalent to q, axes
 %                               are strings or cell strings, '123' = 'xyz', etc.
+%  q1  = Integral(q0,t,w,odeoptions) or
+%  q1  = Integral(q0,t,omega,axis,odeoptions)
+%                               integrate angular velocities to quaternions
+%  mrp = ModifiedRodrigues(q)   Modified Rodrigues parameters equivalent to q
 %  [omega,axis] = OmegaAxis(q,t,dim)
 %                               instantaneous angular velocities and rotation axes
 %  PlotRotation(q,interval)     plot columns of rotation matrices of q,
@@ -74,6 +87,9 @@ classdef quaternion
 %  [q1,w1,t1] = PropagateEulerEq(q0,w0,I,t,@torque,odeoptions)
 %                               Euler equation numerical propagator, see
 %                               help quaternion.PropagateEulerEq
+%  rp = Rodrigues(q)            Rodrigues parameters equivalent to q
+%  Tp = RotateTensor(q,T)       rotations q converted to rotation matrices R,
+%                               acting on 3x3 tensors T: Tp = R * T * R.'
 %  vp = RotateVector(q,v,dim)   vp are 3 component vectors, rotations q acting
 %                               on vectors v, uses rotation matrix multiplication
 %  vp = RotateVectorQ(q,v,dim)  vp are 3 component vectors, rotations q acting
@@ -93,6 +109,7 @@ classdef quaternion
 %  n  = abs(q)                  quaternion norm, n = sqrt( sum( q.e.^2 ))
 %  q3 = bsxfun(func,q1,q2)      binary singleton expansion of operation func
 %  c  = complex(q)              complex( real(q), imag(q) )
+%  Q  = ComplexMatrix(q)        convert quaternions into complex 2x2 matrices
 %  qc = conj(q)                 quaternion conjugate, qc.e =
 %                               [q.e(1);-q.e(2);-q.e(3);-q.e(4)]
 %  qt = ctranspose(q)           qt = q'; quaternion conjugate transpose,
@@ -114,7 +131,7 @@ classdef quaternion
 %  ei = imag(q)                 imaginary e(2) components
 %  qi = interp1(t,q,ti,method)  interpolate quaternion array
 %  qi = inverse(q)              quaternion inverse, qi = conj(q)./norm(q).^2,
-%                               q .* qi = qi .*.q = 1 for q ~= 0
+%                               q .* qi = qi .* q = 1 for q ~= 0
 %  l  = isequal(q1,q2,...)      true if equal sizes and values
 %  l  = isequaln(q1,q2,...)     true if equal including NaNs
 %  l  = isequalwithequalnans(q1,q2,...) true if equal including NaNs
@@ -155,7 +172,7 @@ classdef quaternion
 %  ev = vector(q)               vector e(2:4) components
 %
 % Author:
-%  Mark Tincknell, MIT LL, 29 July 2011, revised 10 January 2013
+%  Mark Tincknell, MIT LL, 29 July 2011, revised 25 June 2015
 
 properties (SetAccess = protected)
     e   = zeros(4,1);
@@ -217,7 +234,8 @@ methods
                             q(iel).e = chop( [0; arg3(:,iel)] );
                         end
                     else
-                        error( 'Invalid input' );
+                        error( 'quaternion:constructor:nargin1', ...
+                               'Invalid input' );
                     end
                 end
 
@@ -226,7 +244,8 @@ methods
                 na  = cellfun( 'prodofsize', varargin );
                 [nel, jel]  = max( na );
                 if ~all( (na == 1) | (na == nel) )
-                    error( 'All inputs must be singletons or have the same number of elements' );
+                    error( 'quaternion:constructor:nargin2', ...
+                           'All inputs must be singletons or have the same number of elements' );
                 end
                 siz = size( varargin{jel} );
                 for iel = nel : -1 : 1
@@ -241,7 +260,8 @@ methods
                 na  = cellfun( 'prodofsize', varargin );
                 [nel, jel]  = max( na );
                 if ~all( (na == 1) | (na == nel) )
-                    error( 'All inputs must be singletons or have the same number of elements' );
+                    error( 'quaternion:constructor:nargin3', ...
+                           'All inputs must be singletons or have the same number of elements' );
                 end
                 siz = size( varargin{jel} );
                 for iel = nel : -1 : 1
@@ -255,7 +275,8 @@ methods
                 na  = cellfun( 'prodofsize', varargin );
                 [nel, jel]  = max( na );
                 if ~all( (na == 1) | (na == nel) )
-                    error( 'All inputs must be singletons or have the same number of elements' );
+                    error( 'quaternion:constructor:nargin4', ...
+                           'All inputs must be singletons or have the same number of elements' );
                 end
                 siz = size( varargin{jel} );
                 for iel = nel : -1 : 1
@@ -266,6 +287,9 @@ methods
                 end
         end % switch nargin
 
+        if nel == 0
+            q   = quaternion.empty;
+        end
         q   = reshape( q, siz );
         if ~isempty( perm )
             q   = ipermute( q, perm );
@@ -305,7 +329,8 @@ methods
         s1  = [s1, ones(1,nd2-nd1)];
         s2  = [s2, ones(1,nd1-nd2)];
         if ~all( (s1 == s2) | (s1 == 1) | (s2 == 1) )
-            error( 'Non-singleton dimensions of q1 and q2 must match each other' );
+            error( 'quaternion:bsxfun:notconformable', ...
+                   'Non-singleton dimensions of q1 and q2 must match each other' );
         end
         c1  = num2cell( s1 );
         c2  = num2cell( s2 );
@@ -423,7 +448,7 @@ methods
         end
     end % diff
 
-    function display( q )
+    function display( q ) %#ok<DISPLAY>
         if ~isequal( get(0,'FormatSpacing'), 'compact' )
             disp(' ');
         end
@@ -488,7 +513,8 @@ methods
         elseif isequal( si1, si2 )
             siz = si1;
         else
-            error( 'Matrix dimensions must agree' );
+            error( 'quaternion:eq:baddims', ...
+                   'Matrix dimensions must agree' );
         end
         l   = bsxfun( @eq, [q1.e], [q2.e] );
         l   = reshape( all( l, 1 ), siz );
@@ -498,7 +524,7 @@ methods
 % function l  = equiv( q1, q2, tol )
 % quaternion rotational equivalence, within tolerance tol,
 % l = (q1 == q2) | (q1 == -q2)
-% optional argument tol (default = eps) sets tolererance for difference
+% optional argument tol (default = eps) sets tolerance for difference
 % from exact equality
         if ~isa( q1, 'quaternion' )
             q1  = quaternion( real(q1), imag(q1), 0, 0 );
@@ -523,7 +549,8 @@ methods
         elseif isequal( si1, si2 )
             siz = si1;
         else
-            error( 'Matrix dimensions must agree' );
+            error( 'quaternion:equiv:baddims', ...
+                   'Matrix dimensions must agree' );
         end
         dm  = chop( bsxfun( @minus, [q1.e], [q2.e] ), tol );
         dp  = chop( bsxfun( @plus,  [q1.e], [q2.e] ), tol );
@@ -560,7 +587,7 @@ methods
 % function qi = interp1( t, q, ti, method ) or
 %          qi = q.interp1( t, ti, method )  or
 %          qi = interp1( q, ti, method )
-% Interpolate quaternion array. If q are rotation quaternions (i.e.
+% Interpolate quaternion array. If q are orientation quaternions (i.e.
 % normalized to 1), then -q is equivalent to q, and the sign of q to use as
 % the second knot of the interpolation is chosen by which ever is closer to
 % the first knot. Extrapolation (i.e. ti < min(t) or ti > max(t)) gives
@@ -578,7 +605,7 @@ methods
             q   = varargin{1};
             siq = size( q );
             if nna == 2
-                if isrow( q )
+                if size( q, 1 ) == 1
                     t = (1 : siq(2)).';
                 else
                     t = (1 : siq(1)).';
@@ -586,7 +613,7 @@ methods
                 ti  = varargin{2}(:);
                 im  = 3;
             elseif isempty( varargin{2} )
-                if isrow( q )
+                if size( q, 1 ) == 1
                     t = (1 : siq(2)).';
                 else
                     t = (1 : siq(1)).';
@@ -602,7 +629,8 @@ methods
             ti  = varargin{3}(:);
             siq = size( q );
         else
-            error( 'Input q must be a quaterion' );
+            error( 'quaternion:interp1:notq', ...
+                   'Input q must be a quaterion' );
         end
         neq = prod( siq );
         if neq == 0
@@ -615,14 +643,15 @@ methods
         else
             [q, dim, perm]  = finddim( q, nt );
             if dim == 0
-                error( 'q must have a dimension the same size as t' );
+                error( 'quaternion:interp1:badt', ...
+                       'q must have a dimension the same size as t' );
             end
         end
         iNf = interp1( t, (1:nt).', ti );
         iN  = max( 1, min( nt-1, floor( iNf )));
         jN  = max( 2, min( nt,   ceil(  iNf )));
         iNm = repmat( iNf - iN, [1, neq / nt] );
-% If q are rotation quaternions (i.e. all normalized to 1), then -q
+% If q are orientation quaternions (i.e. all normalized to 1), then -q
 % represents the same rotation. Pick the sign of +/-q that has the closest
 % dot product to use as the second knot of the interpolation.
         qj  = q(jN,:);
@@ -657,7 +686,7 @@ methods
         end
         d   = double( q );
         d(2:4,:) = -d(2:4,:);
-        n2  = repmat( sum( d.^2, 1 ), 4, ones( 1, ndims( d ) - 1 ));
+        n2  = repmat( sum( d.^2, 1 ), [4, ones(1,ndims(d)-1 )] );
         ne0 = n2 ~= 0;
         di  = Inf( size( d ));
         di(ne0)  = d(ne0) ./ n2(ne0);
@@ -669,7 +698,8 @@ methods
 % function l = isequal( q1, q2, ... )
         nar = numel( varargin );
         if nar == 0
-            error( 'Not enough input arguments' );
+            error( 'quaternion:isequal:noargs', ...
+                   'Not enough input arguments' );
         end
         l   = false;
         if ~isa( q1, 'quaternion' )
@@ -700,7 +730,8 @@ methods
 % function l = isequaln( q1, q2, ... )
         nar = numel( varargin );
         if nar == 0
-            error( 'Not enough input arguments' );
+            error( 'quaternion:isequaln:noargs', ...
+                   'Not enough input arguments' );
         end
         l   = false;
         if ~isa( q1, 'quaternion' )
@@ -731,7 +762,8 @@ methods
 % function l = isequalwithequalnans( q1, q2, ... )
         nar = numel( varargin );
         if nar == 0
-            error( 'Not enough input arguments' );
+            error( 'quaternion:isequalwithequalnans:noargs', ...
+                   'Not enough input arguments' );
         end
         l   = false;
         if ~isa( q1, 'quaternion' )
@@ -803,7 +835,8 @@ methods
             q3  = quaternion.empty;
             return;
         elseif ~isequal( si1, si2 ) && (ne1 ~= 1) && (ne2 ~= 1)
-            error( 'Matrix dimensions must agree' );
+            error( 'quaternion:ldivide:baddims', ...
+                   'Matrix dimensions must agree' );
         end
         for iel = max( ne1, ne2 ) : -1 : 1
             q3(iel) = product( q1(min(iel,ne1)).inverse, ...
@@ -864,7 +897,8 @@ methods
         elseif isequal( si1, si2 )
             siz = si1;
         else
-            error( 'Matrix dimensions must agree' );
+            error( 'quaternion:minus:baddims', ...
+                   'Matrix dimensions must agree' );
         end
         d3  = bsxfun( @minus, [q1.e], [q2.e] );
         q3  = quaternion( d3(1,:), d3(2,:), d3(3,:), d3(4,:) );
@@ -874,7 +908,8 @@ methods
     function q3 = mldivide( q1, q2 )
 % function q3 = mldivide( q1, q2 ), left division only defined for scalar q1
         if numel( q1 ) > 1
-            error( 'Left matix division undefined for quaternion arrays' );
+            error( 'quaternion:mldivide:undefined', ...
+                   'Left matix division undefined for quaternion arrays' );
         end
         q3  = ldivide( q1, q2 );
     end % mldivide
@@ -888,14 +923,16 @@ methods
             qp  = power( q, p );
             return;
         elseif isa( p, 'quaternion' )
-            error( 'Quaternion as matrix exponent is not defined' );
+            error( 'quaternion:mpower:undefined', ...
+                   'Quaternion as matrix exponent is not defined' );
         end
         if (neq == 0) || (nep == 0)
             qp  = quaternion.empty;
             return;
         elseif (nep > 1) || (mod( p, 1 ) ~= 0) || (p < 0) || ...
                (numel( siq ) > 2) || (siq(1) ~= siq(2))
-            error( 'Inputs must be a scalar non-negative integer power and a square quaternion matrix' );
+            error( 'quaternion:mpower:notconformable', ...
+                   'Inputs must be a scalar non-negative integer power and a square quaternion matrix' );
         elseif p == 0
             qp  = quaternion.eye( siq(1) );
             return;
@@ -909,7 +946,8 @@ methods
     function q3 = mrdivide( q1, q2 )
 % function q3 = mrdivide( q1, q2 ), right division only defined for scalar q2
         if numel( q2 ) > 1
-            error( 'Right matix division undefined for quaternion arrays' );
+            error( 'quaternion:mrdivide:undefined', ...
+                   'Right matix division undefined for quaternion arrays' );
         end
         q3  = rdivide( q1, q2 );
     end % mrdivide
@@ -933,10 +971,12 @@ methods
             return;
         end
         if (length( si1 ) ~= 2) || (length( si2 ) ~= 2)
-            error( 'Input arguments must be 2-D' );
+            error( 'quaternion:mtimes:not2D', ...
+                   'Input arguments must be 2-D' );
         end
         if si1(2) ~= si2(1)
-            error( 'Inner matrix dimensions must agree' );
+            error( 'quaternion:mtimes:notconformable', ...
+                   'Inner matrix dimensions must agree' );
         end
         q3  = repmat( quaternion, [si1(1) si2(2)] );
         for i1 = 1 : si1(1)
@@ -966,8 +1006,6 @@ methods
                 n   = zeros( siz );
             end
             return;
-        elseif nel > 1
-            nel = [];
         end
         d   = double( q );
         n   = sqrt( sum( d.^2, 1 ));
@@ -977,7 +1015,7 @@ methods
             end
             return;
         end
-        n4  = repmat( n, 4, nel );
+        n4  = repmat( n, [4, ones(1,ndims(n)-1)] );
         ne0 = (n4 ~= 0) & (n4 ~= 1);
         d(ne0)  = d(ne0) ./ n4(ne0);
         q   = reshape( quaternion( d(1,:), d(2,:), d(3,:), d(4,:) ), siz );
@@ -1007,7 +1045,8 @@ methods
         elseif isequal( si1, si2 )
             siz = si1;
         else
-            error( 'Matrix dimensions must agree' );
+            error( 'quaternion:plus:baddims', ...
+                   'Matrix dimensions must agree' );
         end
         d3  = bsxfun( @plus, [q1.e], [q2.e] );
         q3  = quaternion( d3(1,:), d3(2,:), d3(3,:), d3(4,:) );
@@ -1024,7 +1063,8 @@ methods
             qp  = quaternion.empty;
             return;
         elseif ~isequal( siq, sip ) && (neq ~= 1) && (nep ~= 1)
-            error( 'Matrix dimensions must agree' );
+            error( 'quaternion:power:baddims', ...
+                   'Matrix dimensions must agree' );
         end
         qp  = exp( p .* log( q ));
     end % power
@@ -1064,7 +1104,8 @@ methods
             q2  = quaternion( real(q2), imag(q2), 0, 0 );
         end
         if (numel( q1 ) ~= 1) || (numel( q2 ) ~= 1)
-            error( 'product not defined for arrays, use mtimes or times' );
+            error( 'quaternion:product:onlyscalars', ...
+                   'product not defined for arrays, use mtimes or times' );
         end
         ee  = q1.e * q2.e.';
         eo  = [ee(1,1) - ee(2,2) - ee(3,3) - ee(4,4); ...
@@ -1090,7 +1131,8 @@ methods
             q3  = quaternion.empty;
             return;
         elseif ~isequal( si1, si2 ) && (ne1 ~= 1) && (ne2 ~= 1)
-            error( 'Matrix dimensions must agree' );
+            error( 'quaternion:rdivide:baddims', ...
+                   'Matrix dimensions must agree' );
         end
         for iel = max( ne1, ne2 ) : -1 : 1
             q3(iel) = product( q1(min(iel,ne1)), ...
@@ -1163,7 +1205,8 @@ methods
             q3  = quaternion.empty;
             return;
         elseif ~isequal( si1, si2 ) && (ne1 ~= 1) && (ne2 ~= 1)
-            error( 'Matrix dimensions must agree' );
+            error( 'quaternion:times:baddims', ...
+                   'Matrix dimensions must agree' );
         end
         for iel = max( ne1, ne2 ) : -1 : 1
             q3(iel) = product( q1(min(iel,ne1)), q2(min(iel,ne2)) );
@@ -1232,13 +1275,35 @@ methods
         axis        = squeeze( axis );
     end % AngleAxis
 
+    function Q = ComplexMatrix( q )
+% function Q = ComplexMatrix( q )  or  Q = q.ComplexMatrix
+% Convert quaternions into special complex 2x2 matrices. Matrix algebra
+% with Q (e.g. sum, difference, matrix product, matrix inverse) is
+% equivalent to the same operation with quaternions. Quaternions can be
+% created from 2x2 complex matrices with quaternion.complexmatrix(Q)
+% (lower case).
+% Input:
+%  q        array of N quaternions, q.e = [A; B; C; D]
+% Output:
+%  Q        2x2xN array of complex matrices
+%           Q = [ A + B*i, C - D*i;
+%                -C - D*i, A - B*i]
+        siz = size( q );
+        d   = double( q );
+        Q   = [complex( d(1,:), d(2,:));
+               complex(-d(3,:),-d(4,:));
+               complex( d(3,:),-d(4,:));
+               complex( d(1,:),-d(2,:))];
+        Q   = squeeze( reshape( Q, [2, 2, siz] ));
+    end % ComplexMatrix
+
     function qd = Derivative( varargin )
-% function qd = Derivative( q, w )   or   qd = q.Derivative( w )
+% function qd = Derivative( q, w )  or  qd = q.Derivative( w )
 % Inputs:
 %  q        quaternion array
 %  w        3xN or Nx3 element angle rate vectors in radians/s
 % Output:
-%  qd       quaternion derivatives
+%  qd       quaternion derivatives, qd = 0.5 * q * quaternion(w)
         if isa( varargin{1}, 'quaternion' )
             qd  = 0.5 .* varargin{1} .* quaternion( varargin{2} );
         else
@@ -1247,7 +1312,7 @@ methods
     end % Derivative
 
     function angles = EulerAngles( varargin )
-% function angles = EulerAngles( q, axes )   or   angles = q.EulerAngles( axes )
+% function angles = EulerAngles( q, axes )  or  angles = q.EulerAngles( axes )
 % Construct Euler angle triplets equivalent to quaternion rotations
 % Inputs:
 %  q        quaternion array
@@ -1262,7 +1327,8 @@ methods
             ics = cellfun( @iscellstr, varargin );
         end
         if ~any( ics )
-            error( 'Must provide axes as a string (e.g. ''123'') or cell string (e.g. {''123''})' );
+            error( 'quaternion:EulerAngles:badaxes', ...
+                   'Must provide axes as a string (e.g. ''123'') or cell string (e.g. {''123''})' );
         end
         siv     = cellfun( @size, varargin, 'UniformOutput', false );
         axes    = varargin{ics};
@@ -1281,7 +1347,8 @@ methods
             siz = siq;
             nel = neq;
         else
-            error( 'Must have compatible dimensions for quaternion and axes' );
+            error( 'quaternion:EulerAngles:notconformable', ...
+                   'Must have compatible dimensions for quaternion and axes' );
         end
         angles  = zeros( [3 siz] );
         q       = normalize( q );
@@ -1397,11 +1464,108 @@ methods
                         q(iel).e(2).*q(iel).e(1)),(q(iel).e(2).*q(iel).e(4)+ ...
                         q(iel).e(3).*q(iel).e(1)));
                 otherwise
-                    error( 'Invalid output Euler angle axes' );
+                    error( 'quaternion:EulerAngles:badaxes', ...
+                           'Invalid output Euler angle axes' );
             end % switch axes
         end % for iel
         angles  = chop( angles );
     end % EulerAngles
+
+    function q1 = Integral( q0, t, w, varargin )
+% Integrate angular velocities over time (using ode45) to obtain the
+% orientation quaternions at those times, starting from initial scalar q0.
+% Angular velocities (and rotation axes) are computed at intermediate times
+% by spline interpolation. Use q0 = quaternion(1,0,0,0) as the initial
+% value unless there is an initial orientation.
+%
+% Calling syntax 1:
+% function q1 = Integral( q0, t, w, odeoptions )
+% Inputs:
+%  q0           initial orientation quaternion (normalized, scalar)
+%  t(nt)        initial and subsequent (or previous) times t = [t0,t1,...]
+%               (monotonic)
+%  w(3,nt)      3D angular velocity vectors, radians/(unit time)
+%  odeoptions [OPTIONAL] ode45 options
+%
+% Calling syntax 2:
+% function q1 = Integral( q0, t, omega, axis, odeoptions )
+% Inputs:
+%  q0           initial orientation quaternion (normalized, scalar)
+%  t(nt)        initial and subsequent (or previous) times t = [t0,t1,...]
+%               (monotonic)
+%  omega(nt)    angular velocities, radians/(unit time)
+%  axis(3,nt)   3D rotation axis vectors (normalized to unit vectors
+%               internally)
+%  odeoptions [OPTIONAL] ode45 options
+%
+% Output (either syntax):
+%  q1(nt)       array of normalized quaternions at times t
+%
+% Calls:
+%  Derivative   quaternion derivative method
+%  odeset       matlab ode options setter
+%  ode45        matlab ode numerical differential equation integrator
+        if (nargin > 3) && isnumeric( varargin{1} ) && ...
+           (numel( varargin{1} ) >= 3)
+            omega       = w;
+            [axis, dim] = finddim( varargin{1}, 3 );
+            if dim == 0
+                error( 'quaternion:Integral:badaxis', ...
+                       'axis must have a dimension of size 3' );
+            end
+            axis        = unitvector( axis(1:3,:), 1 );
+            w           = bsxfun( @times, omega(:).', axis );
+            varargin    = varargin(2:end);
+        end
+        [w, dim]    = finddim( w, 3 );
+        if dim == 0
+            error( 'quaternion:Integral:badw', ...
+                   'w must have a dimension of size 3' );
+        end
+        w           = reshape( w, 3, [] );
+        nw          = size( w, 2 );
+        wend        = w(:,end);
+        nt          = numel( t );
+        w           = [ w, wend(:,ones(1,nt-nw)) ];
+        if isempty( q0 )
+            y0      = [ 1; 0; 0; 0 ];
+        else
+            q0      = q0.normalize;
+            y0      = q0.e;
+        end
+        if isempty( t )
+            nt      = nw;
+            t       = 1 : nt;
+        end
+        wpp         = spline( t, w );
+        options     = odeset( varargin{:} );
+        [~, Y]      = ode45( @Funct, t, y0, options );
+            function yd = Funct( ti, yi )
+                qi  = quaternion( yi(1), yi(2), yi(3), yi(4) );
+                qi  = qi.normalize;
+                wi  = ppval( wpp, ti );
+                yd  = double( qi.Derivative( wi ));
+            end
+        q1          = quaternion( Y(:,1), Y(:,2), Y(:,3), Y(:,4) );
+        q1          = q1.normalize;
+        neg         = real( q1 ) < 0;
+        q1(neg)     = -q1(neg);     % keep real element >= 0
+        q1          = reshape( q1, size(t) );
+    end % Integral
+
+    function mrp = ModifiedRodrigues( q )
+% function mrp = ModifiedRodrigues( q )  or  rp = q.ModifiedRodrigues
+% Construct Modified Rodrigues parameters from rotation quaternions
+% Input:
+%  q        quaternion array
+% Output:
+%  mrp      Modified Rodrigues parameter array, mrp = axis .* tan(angle/4)
+        [angle, axis] = q.AngleAxis;
+        if size( angle, 1 ) ~= 1
+            angle = shiftdim( angle, -1 );
+        end
+        mrp = bsxfun( @times, tan( 0.25 * angle ), axis );
+    end % ModifiedRodrigues
 
     function [omega, axis] = OmegaAxis( q, t, dim )
 % function [omega, axis] = OmegaAxis( q, t, dim )  or
@@ -1425,6 +1589,7 @@ methods
 %             the first non-singleton dimension is used.
 % Outputs:
 %  omega      array of instantaneous angular velocities, radians/(unit time)
+%             omega >= 0
 %  axis       instantaneous 3D rotation axis unit vectors at each time
         if isempty( q )
             omega   = [];
@@ -1441,7 +1606,8 @@ methods
                     dim   = find( siq == length( t ), 1 );
                 end
                 if isempty( dim )
-                    error( 'size of t must agree with at least one dimension of q' );
+                    error( 'quaternion:OmegaAxis:notconformable', ...
+                           'size of t must agree with at least one dimension of q' );
                 elseif dim > 1
                     ndm   = ndims( q );
                     perm  = [ dim : ndm, 1 : dim-1 ];
@@ -1454,7 +1620,7 @@ methods
                 [q, dim, perm] = finddim( q, -2 );
                 if dim == 0
                     omega = 0;
-                    axis  = unitvector( q.e(2:4) );
+                    axis  = unitvector( q.e(2:4), 1 );
                     return;
                 end
             end
@@ -1465,7 +1631,8 @@ methods
         end
         n   = norm( q );
         if ~all( abs( n(:) - 1 ) < eps(16) )
-            error( 'q must be normalized' );
+            error( 'quaternion:OmegaAxis:qnotnorm', ...
+                   'q must be normalized' );
         end
         siq = size( q );
         if (nargin < 2) || isempty( t )
@@ -1473,7 +1640,8 @@ methods
         elseif length( t ) == siq(1)
             t   = repmat( t(:), [1 siq(2:end)] );
         elseif ~isequal( siq, size( t ))
-            error( 'size of t must match size of q' );
+            error( 'quaternion:OmegaAxis:notconformable', ...
+                   'size of t must match size of q' );
         end
         dt            = zeros( siq );
         difft         = diff( t, 1 );
@@ -1499,7 +1667,7 @@ methods
     end % OmegaAxis
 
     function PlotRotation( q, interval )
-% function PlotRotation( q, interval )   or   q.PlotRotation( interval )
+% function PlotRotation( q, interval )  or  q.PlotRotation( interval )
 % Inputs:
 %  q          quaternion array
 %  interval   pause between figure updates in seconds, default = 0.1
@@ -1513,7 +1681,7 @@ methods
         or  = zeros(1,3);
         ax  = eye(3);
         alx = zeros( nel, 3, 3 );
-        figure;
+        newplot;
         for iel = 1 : nel
 %           plot3( [ or; ax(:,1).' ], [ or ; ax(:,2).' ], [ or; ax(:,3).' ], ':' );
             plot3( [ or; ax(1,:) ], [ or ; ax(2,:) ], [ or; ax(3,:) ], ':' );
@@ -1600,8 +1768,67 @@ methods
         q1(neg) = -q1(neg);     % keep real element >= 0
     end % PropagateEulerEq
 
+    function rp = Rodrigues( q )
+% function rp = Rodrigues( q )  or  rp = q.Rodrigues
+% Construct Rodrigues parameters from rotation quaternions
+% Input:
+%  q        quaternion array
+% Output:
+%  rp       Rodrigues parameter array, rp = axis .* tan(angle/2)
+        [angle, axis] = q.AngleAxis;
+        if size( angle, 1 ) ~= 1
+            angle = shiftdim( angle, -1 );
+        end
+        rp  = bsxfun( @times, tan( 0.5 * angle ), axis );
+    end % Rodrigues
+
+    function Tp = RotateTensor( varargin )
+% function Tp = RotateTensor( q, T )  or  Tp = q.RotateTensor( T )
+% 3x3 rotation matrices R are created from q and matrix multiplication
+% rotates 3x3 matrices T into Tp: Tp = R * T * R.'.
+% Inputs:
+%  q        quaternion array
+%  T        3x3xN element Cartesian tensors
+% Output:
+%  Tp       3x3xN element rotated tensors
+        if nargin < 2
+            error( 'quaternion:RotateTensor:noargs', ...
+                   'RotateTensor requires 2 inputs: a 3x3xN array and a quaternion' );
+        end
+        if isa( varargin{1}, 'quaternion' )
+            q   = varargin{1};
+            T   = varargin{2};
+        else
+            T   = varargin{1};
+            q   = varargin{2};
+        end
+        siT = [size( T ), 1];
+        if ~all( siT(1:2) == [3 3] )
+            error( 'quaternion:RotateTensor:not3x3', ...
+                   'Dimension of T must be 3x3xN' );
+        end
+        neT = prod( siT(3:end) );
+        neq = numel( q );
+        R   = q.RotationMatrix;
+        if (neq == neT) || (neq == 1)
+            Tp  = zeros( siT );
+            for iel = 1 : neT
+                Rm  = R(:,:,min(neq,iel));
+                Tp(:,:,iel) = Rm * T(:,:,iel) * Rm.';
+            end
+        elseif neT == 1
+            Tp  = zeros( [3, 3, neq] );
+            for iel = 1 : neq
+                Tp(:,:,iel) = R(:,:,iel) * T * R(:,:,iel).';
+            end
+        else
+            error( 'quaternion:RotateTensor:notconformable', ...
+                   'q and T must have compatible dimensions' );
+        end
+    end % RotateTensor
+
     function vp = RotateVector( varargin )
-% function vp = RotateVector( q, v, dim ) or
+% function vp = RotateVector( q, v, dim )  or
 %          vp = q.RotateVector( v, dim )
 % 3x3 rotation matrices are created from q and matrix multiplication
 % rotates v into vp. RotateVector is 7 times faster than RotateVectorQ.
@@ -1612,7 +1839,8 @@ methods
 % Output:
 %  vp       3xN or Nx3 element rotated vectors
         if nargin < 2
-            error( 'RotateVector method requires 2 inputs: a vector and a quaternion' );
+            error( 'quaternion:RotateVector:noargs', ...
+                   'RotateVector requires 2 inputs: a vector and a quaternion' );
         end
         if isa( varargin{1}, 'quaternion' )
             q   = varargin{1};
@@ -1624,7 +1852,8 @@ methods
         if (nargin > 2) && ~isempty( varargin{3} )
             dim = varargin{3};
             if size( v, dim ) ~= 3
-                error( 'Dimension dim of vector v must be size 3' );
+                error( 'quaternion:RotateVector:not3D', ...
+                       'Dimension dim of vector v must be size 3' );
             end
             if dim > 1
                 ndm  = ndims( v );
@@ -1634,7 +1863,8 @@ methods
         else
             [v, dim, perm] = finddim( v, 3 );
             if dim == 0
-                error( 'v must have a dimension of size 3' );
+                error( 'quaternion:RotateVector:not3D', ...
+                       'v must have a dimension of size 3' );
             end
         end
         sip = size( v );
@@ -1667,12 +1897,13 @@ methods
                 vp  = ipermute( vp, perm );
             end
         else
-            error( 'q and v must have compatible dimensions' );
+            error( 'quaternion:RotateVector:notconformable', ...
+                   'q and v must have compatible dimensions' );
         end
     end % RotateVector
 
     function vp = RotateVectorQ( varargin )
-% function vp = RotateVectorQ( q, v, dim ) or
+% function vp = RotateVectorQ( q, v, dim )  or
 %          vp = q.RotateVectorQ( v, dim )
 % quaternions are created from v and quaternion multiplication rotates v
 % into vp. RotateVector is 7 times faster than RotateVectorQ.
@@ -1683,7 +1914,8 @@ methods
 % Output:
 %  vp       3xN or Nx3 element rotated vectors
         if nargin < 2
-            error( 'RotateVectorQ method requires 2 inputs: a vector and a quaternion' );
+            error( 'quaternion:RotateVectorQ:noargs', ...
+                   'RotateVectorQ requires 2 inputs: a vector and a quaternion' );
         end
         if isa( varargin{1}, 'quaternion' )
             q   = varargin{1};
@@ -1696,7 +1928,8 @@ methods
         if (nargin > 2) && ~isempty( varargin{3} )
             dim = varargin{3};
             if size( v, dim ) ~= 3
-                error( 'Dimension dim of vector v must be size 3' );
+                error( 'quaternion:RotateVectorQ:not3D', ...
+                       'Dimension dim of vector v must be size 3' );
             end
             if dim > 1
                 ndm  = ndims( v );
@@ -1706,7 +1939,8 @@ methods
         else
             [v, dim, perm] = finddim( v, 3 );
             if dim == 0
-                error( 'v must have a dimension of size 3' );
+                error( 'quaternion:RotateVectorQ:not3D', ...
+                       'v must have a dimension of size 3' );
             end
         end
         sip = size( v );
@@ -1735,7 +1969,7 @@ methods
     end % RotateVectorQ
 
     function R = RotationMatrix( q )
-% function R = RotationMatrix( q )   or   R = q.RotationMatrix
+% function R = RotationMatrix( q )  or  R = q.RotationMatrix
 % Construct rotation (or direction cosine) matrices from quaternions
 % Input:
 %  q        quaternion array
@@ -1779,7 +2013,8 @@ methods(Static)
         six = size( axis );
         [axis, dim, perm] = finddim( axis, 3 );
         if dim == 0
-            error( 'axis must have a dimension of size 3' );
+            error( 'quaternion:angleaxis:not3D', ...
+                   'axis must have a dimension of size 3' );
         end
         neg = prod( sig );
         nex = prod( six )/ 3;
@@ -1794,7 +2029,8 @@ methods(Static)
             siz     = sig;
             nel     = neg;
         else
-            error( 'angle and axis must have compatible sizes' );
+            error( 'quaternion:angleaxis:notconformable', ...
+                   'angle and axis must have compatible sizes' );
         end
         for iel = nel : -1 : 1
             d(:,iel) = AngAxis2e( angle(min(iel,neg)), axis(:,min(iel,nex)) );
@@ -1806,8 +2042,28 @@ methods(Static)
         end
     end % quaternion.angleaxis
 
+    function q = complexmatrix( Q )
+% function q = quaternion.complexmatrix( Q )
+% Construct quaternions from special complex 2x2 matrices. Matrix algebra
+% with Q (e.g. sum, difference, matrix product, matrix inverse) is
+% equivalent to the same operation with quaternions. Complex matrices can
+% be created from quaternions with q.ComplexMatrix (upper case).
+% Input:
+%  Q        2x2xN array of complex matrices, [a, c; b, d]
+% Output:
+%  q        array of N quaternions
+%           q.e(1) = (d + a)/2, q.e(2) = i*(d - a)/2,
+%           q.e(3) = (c - b)/2, q.e(4) = i*(c + b)/2
+        siQ = [size( Q ), 1, 1];
+        q1  = 0.5 *( Q(2,2,:) + Q(1,1,:) );
+        q2  = 0.5 *( Q(2,2,:) - Q(1,1,:) )* 1i;
+        q3  = 0.5 *( Q(1,2,:) - Q(2,1,:) );
+        q4  = 0.5 *( Q(1,2,:) + Q(2,1,:) )* 1i;
+        q   = reshape( quaternion( q1, q2, q3, q4 ), siQ(3:end) );
+    end % complexmatrix
+
     function q = eulerangles( varargin )
-% function q = quaternion.eulerangles( axes, angles )  OR
+% function q = quaternion.eulerangles( axes, angles )  or
 % function q = quaternion.eulerangles( axes, ang1, ang2, ang3 )
 % Construct quaternions from triplets of axes and Euler angles
 % Inputs:
@@ -1834,7 +2090,8 @@ methods(Static)
             sig     = siv{~ics};
             [angles, dim, perm] = finddim( angles, 3 );
             if dim == 0
-                error( 'Must supply 3 Euler angles' );
+                error( 'quaternion:eulerangles:badaxes', ...
+                       'Must supply 3 Euler angles' );
             end
             sig(dim)    = 1;
             neg         = prod( sig );
@@ -1856,7 +2113,8 @@ methods(Static)
             na      = cellfun( 'prodofsize', angles );
             [neg, jeg] = max( na );
             if ~all( (na == 1) | (na == neg) )
-                error( 'All angles must be singletons or have the same number of elements' );
+                error( 'quaternion:eulerangles:notconformable', ...
+                       'All angles must be singletons or have the same number of elements' );
             end
             sig = size( angles{jeg} );
             if nex == 1
@@ -1874,7 +2132,8 @@ methods(Static)
                                        angles{3}(min(iel,na(3)))] );
             end
         else
-            error( 'Must supply either 2 or 4 input arguments' );
+            error( 'quaternion:eulerangles:badinputs', ...
+                   'Must supply either 2 or 4 input arguments' );
         end % if nargin
 
         q   = reshape( q, siz );
@@ -1897,6 +2156,58 @@ methods(Static)
             q   = quaternion( eye(N), 0, 0, 0 );
         end
     end % quaternion.eye
+
+    function q = integrateomega( varargin )
+% Integrate angular velocities over time (using ode45) to obtain the
+% orientation quaternions at those times, using quaternion.Integral and
+% initial quaternion(1,0,0,0)
+%
+% Calling syntax 1:
+% function q = quaternion.integrateomega( t, w, odeoptions )
+% Inputs:
+%  t(nt)        initial and subsequent (or previous) times t = [t0,t1,...]
+%               (monotonic)
+%  w(3,nt)      3D angular velocity vectors, radians/(unit time)
+%  odeoptions [OPTIONAL] ode45 options
+%
+% Calling syntax 2:
+% function q = quaternion.integrateomega( t, omega, axis, odeoptions )
+% Inputs:
+%  t(nt)        initial and subsequent (or previous) times t = [t0,t1,...]
+%               (monotonic)
+%  omega(nt)    angular velocities, radians/(unit time)
+%  axis(3,nt)   3D rotation axis vectors (normalized to unit vectors
+%               internally)
+%  odeoptions [OPTIONAL] ode45 options
+%
+% Output (either syntax):
+%  q(nt)        array of normalized quaternions at times t
+%
+% Calls:
+%  Integral     quaternion integral method
+        q   = Integral( quaternion(1,0,0,0), varargin{:} );
+    end % integrateomega
+
+    function q = modifiedrodrigues( mrp )
+% function q = quaternion.modifiedrodrigues( mrp )
+% Construct rotation quaternions from Modified Rodrigues parameters
+% Input:
+%  mrp      array of Modified Rodrigues parameters, mrp = axis.*tan(angle/4)
+% Output:
+%  q        array of normalized (rotation) quaternions
+        [mrp, dim, perm] = finddim( mrp, 3 );
+        if dim == 0
+            error( 'quaternion:modifiedrodrigues:badpar', ...
+                   'Input must have a dimension of length 3' );
+        end
+        [axis, magn] = unitvector( mrp );
+        siz   = size( magn );
+        angle = 4 * atan( reshape( magn(1,:), [1, siz(2:end)] ));
+        q     = quaternion.angleaxis( angle, axis );
+        if dim > 1
+            q = ipermute( q, perm );
+        end
+    end % modifiedrodrigues
 
     function q = nan( varargin )
 % function q = quaternion.nan( siz )
@@ -2002,6 +2313,27 @@ methods(Static)
         q   = reshape( q, siz );
     end % quaternion.randRot
 
+    function q = rodrigues( rp )
+% function q = quaternion.rodrigues( rp )
+% Construct rotation quaternions from Rodrigues parameters
+% Input:
+%  rp       array of Rodrigues parameters, rp = axis .* tan(angle/2)
+% Output:
+%  q        array of normalized (rotation) quaternions
+        [rp, dim, perm] = finddim( rp, 3 );
+        if dim == 0
+            error( 'quaternion:rodrigues:badpar', ...
+                   'Input must have a dimension of length 3' );
+        end
+        [axis, magn] = unitvector( rp );
+        siz   = size( magn );
+        angle = 2 * atan( reshape( magn(1,:), [1, siz(2:end)] ));
+        q     = quaternion.angleaxis( angle, axis );
+        if dim > 1
+            q = ipermute( q, perm );
+        end
+    end % rodrigues
+
     function q = rotateutov( u, v, dimu, dimv )
 % function q = quaternion.rotateutov( u, v, dimu, dimv )
 % Construct quaternions to rotate vectors u into directions of vectors v
@@ -2015,7 +2347,8 @@ methods(Static)
         if (nargin < 3) || isempty( dimu )
             [u, dimu, permu] = finddim( u, 3 );
             if dimu == 0
-                error( 'u must have a dimension of size 3' );
+                error( 'quaternion:rotateutov:not3D', ...
+                       'u must have a dimension of size 3' );
             end
         elseif dimu > 1
             ndmu  = ndims( u );
@@ -2030,7 +2363,8 @@ methods(Static)
         if (nargin < 4) || isempty( dimv )
             [v, dimv, permv] = finddim( v, 3 );
             if dimv == 0
-                error( 'v must have a dimension of size 3' );
+                error( 'quaternion:rotateutov:not3D', ...
+                       'v must have a dimension of size 3' );
             end
         elseif dimv > 1
             ndmv  = ndims( v );
@@ -2058,7 +2392,8 @@ methods(Static)
             perm = permv;
             dim  = dimv;
         else
-            error( 'Number of 3 element vectors in u and v must be 1 or equal' );
+            error( 'quaternion:rotateutov:notconformable', ...
+                   'Number of 3 element vectors in u and v must be 1 or equal' );
         end
         for iel = nel : -1 : 1
             q(iel)  = UV2q( u(:,min(iel,neu)), v(:,min(iel,nev)) );
@@ -2078,7 +2413,8 @@ methods(Static)
         siz = [size(R) 1 1];
         if ~all( siz(1:2) == [3 3] ) || ...
            (abs( det( R(:,:,1) ) - 1 ) > eps(16) )
-            error( 'Rotation matrices must be 3x3xN with det(R) == 1' );
+            error( 'quaternion:rotationmatrix:baddet', ...
+                   'Rotation matrices must be 3x3xN with det(R) == 1' );
         end
         nel = prod( siz(3:end) );
         for iel = nel : -1 : 1
@@ -2150,7 +2486,8 @@ for i0 = 1 : na
         case {'3', 'k', 'z', 'Z'}
             axis(:,i0) = [ 0; 0; 1 ];
         otherwise
-            error( 'Illegal axis designation' );
+            error( 'quaternion:EulerAng2q:badaxis', ...
+                   'Illegal axis designation' );
     end
 end
 q0   = quaternion.angleaxis( angles(:).', axis );
@@ -2166,7 +2503,7 @@ end % EulerAng2q
 function eout = RotMat2e( R )
 % function eout = RotMat2e( R )
 % One Rotation Matrix -> one quaternion
-eout    = zeros(4,1);
+eout    = zeros( 4, 1 );
 if ~all( all( R == 0 ))
     eout(1) = 0.5 * sqrt( max( 0, R(1,1) + R(2,2) + R(3,3) + 1 ));
     if eout(1) == 0
@@ -2274,3 +2611,37 @@ function s = sgn( x )
 s   = ones( size( x ));
 s(x < 0) = -1;
 end % sgn
+
+function [u, n] = unitvector( v, dim )
+% function [u, n] = unitvector( v, dim )
+% Inputs:
+%  v                matrix of vectors
+%  dim [OPTIONAL]   dimension to normalize, dim >= 1
+%                   if no dim input, use first dimension of length >= 2
+% Outputs:
+%  u                matrix of unit vectors (except for vectors of norm 0)
+%  n                matrix same size as v and u of norms
+ndm = ndims( v );
+if (nargin < 2) || isempty( dim )
+    [v, dim, perm] = finddim( v, -2 );
+    if dim == 0
+        n     = sqrt( v.*conj(v) );
+        n0    = (n ~= 0) & (n ~= 1);
+        u     = v;
+        u(n0) = v(n0) ./ n(n0);
+        return;
+    end
+else
+    perm = [ dim : ndm, 1 : dim-1 ];
+    v    = permute( v, perm );
+end
+u     = v;
+sv    = size( v );
+n     = repmat( sqrt( sum( v.*conj(v), 1 )), [sv(1) ones(1,ndm-1)] );
+n0    = (n ~= 0) & (n ~= 1);
+u(n0) = v(n0) ./ n(n0);
+u     = ipermute( u, perm );
+if nargout > 1
+    n = ipermute( n, perm );
+end
+end % unitvector

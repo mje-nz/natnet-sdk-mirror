@@ -16,20 +16,18 @@
 #undef APSTUDIO_READONLY_SYMBOLS
 
 /////////////////////////////////////////////////////////////////////////////
-// English (U.S.) resources
+// English (United States) resources
 
 #if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_ENU)
-#ifdef _WIN32
 LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US
 #pragma code_page(1252)
-#endif //_WIN32
 
 /////////////////////////////////////////////////////////////////////////////
 //
 // Menu
 //
 
-IDC_NATNETSAMPLE MENU 
+IDC_NATNETSAMPLE MENU
 BEGIN
     POPUP "&File"
     BEGIN
@@ -73,13 +71,13 @@ END
 // Dialog
 //
 
-IDD_NATNET DIALOGEX 0, 0, 186, 100
+IDD_NATNET DIALOGEX 0, 0, 187, 117
 STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | DS_CENTER | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
 CAPTION "NatNet Connect"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
     LTEXT           "IP Address",IDC_STATIC,9,51,60,10
-    PUSHBUTTON      "Connect",IDC_CONNECT,65,81,50,12
+    PUSHBUTTON      "Connect",IDC_CONNECT,65,98,50,12
     LTEXT           "On Arena's ""Other"" tab, click on ""Stream Frames"" button. Select ""3D Marker Positions"", ""Rigid Body Data"", and ""Right Hand Coord"" check boxes. ",IDC_STATIC,11,8,165,32
     EDITTEXT        IDC_EDIT1,70,50,25,12,ES_CENTER | ES_AUTOHSCROLL
     EDITTEXT        IDC_EDIT2,97,50,25,12,ES_CENTER | ES_AUTOHSCROLL
@@ -90,6 +88,8 @@ BEGIN
     EDITTEXT        IDC_EDIT6,97,66,25,12,ES_CENTER | ES_AUTOHSCROLL
     EDITTEXT        IDC_EDIT7,125,66,25,12,ES_CENTER | ES_AUTOHSCROLL
     EDITTEXT        IDC_EDIT8,153,66,25,12,ES_CENTER | ES_AUTOHSCROLL
+    COMBOBOX        IDC_COMBO_CONNTYPE,70,81,109,50,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Connection Type",IDC_STATIC,9,83,60,10
 END
 
 
@@ -99,19 +99,34 @@ END
 //
 
 #ifdef APSTUDIO_INVOKED
-GUIDELINES DESIGNINFO 
+GUIDELINES DESIGNINFO
 BEGIN
     IDD_NATNET, DIALOG
     BEGIN
         LEFTMARGIN, 7
-        RIGHTMARGIN, 179
+        RIGHTMARGIN, 180
         TOPMARGIN, 7
-        BOTTOMMARGIN, 93
+        BOTTOMMARGIN, 110
     END
 END
 #endif    // APSTUDIO_INVOKED
 
-#endif    // English (U.S.) resources
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Dialog Info
+//
+
+IDD_NATNET DLGINIT
+BEGIN
+    IDC_COMBO_CONNTYPE, 0x403, 10, 0
+0x754d, 0x746c, 0x6369, 0x7361, 0x0074, 
+    IDC_COMBO_CONNTYPE, 0x403, 8, 0
+0x6e55, 0x6369, 0x7361, 0x0074, 
+    0
+END
+
+#endif    // English (United States) resources
 /////////////////////////////////////////////////////////////////////////////
 
 

@@ -27,6 +27,7 @@ using System.Threading;
 using System.Runtime.InteropServices;
 
 using NatNetML;
+using System.Reflection;
 
 /*
  *
@@ -49,38 +50,58 @@ namespace WinFormTestApp
 {
     public partial class Form1 : Form
     {
+        // Helper class for discovering NatNet servers.
+        private NatNetServerDiscovery m_Discovery = new NatNetServerDiscovery();
+
         // [NatNet] Our NatNet object
         private NatNetML.NatNetClientML m_NatNet;
 
         // [NatNet] Our NatNet Frame of Data object
         private NatNetML.FrameOfMocapData m_FrameOfData = new NatNetML.FrameOfMocapData();
 
+        // Time that has passed since the NatNet server transmitted m_FrameOfData.
+        private double m_FrameOfDataTransitLatency;
+
         // [NatNet] Description of the Active Model List from the server (e.g. Motive)
         NatNetML.ServerDescription desc = new NatNetML.ServerDescription();
 
         // [NatNet] Queue holding our incoming mocap frames the NatNet server (e.g. Motive)
-        private Queue<NatNetML.FrameOfMocapData> m_FrameQueue = new Queue<NatNetML.FrameOfMocapData>();
+        private Queue<NatNetML.FrameOfMocapData> m_FrontQueue = new Queue<NatNetML.FrameOfMocapData>();
+        private Queue<NatNetML.FrameOfMocapData> m_BackQueue = new Queue<NatNetML.FrameOfMocapData>();
+        private static object FrontQueueLock = new object();
+        private static object BackQueueLock = new object();
 
-        // spreadsheet lookup
+        // Records the age of each frame in m_FrameQueue at the time it arrived.
+        private Queue<double> m_FrameTransitLatencies = new Queue<double>();
+
+        // data grid
         Hashtable htMarkers = new Hashtable();
-        Hashtable htRigidBodies = new Hashtable();
+        
         List<RigidBody> mRigidBodies = new List<RigidBody>();
+        Hashtable htRigidBodies = new Hashtable();
+        Hashtable htRigidBodyMarkers = new Hashtable();
+        
         Hashtable htSkelRBs = new Hashtable();
-
-        Hashtable htForcePlates = new Hashtable();
+        
         List<ForcePlate> mForcePlates = new List<ForcePlate>();
+        Hashtable htForcePlates = new Hashtable();
+        
+        List<Device> mDevices = new List<Device>();
+        Hashtable htDevices = new Hashtable();
+        private int mLastRowCount;
+        private int minGridHeight;
 
-        // graphing support
-        const int GraphFrames = 500;
+        // graph
+        const int GraphFrames = 10000;
         int m_iLastFrameNumber = 0;
         const int maxSeriesCount = 10;
 
         // frame timing information
         double m_fLastFrameTimestamp = 0.0f;
-        float m_fCurrentMocapFrameTimestamp = 0.0f;
-        float m_fFirstMocapFrameTimestamp = 0.0f;
         QueryPerfCounter m_FramePeriodTimer = new QueryPerfCounter();
-        QueryPerfCounter m_UIUpdateTimer = new QueryPerfCounter();
+        QueryPerfCounter m_ProcessingTimer = new QueryPerfCounter();
+        private double interframeDuration;
+        private int droppedFrameIndicator = 0;
 
         // server information
         double m_ServerFramerate = 1.0f;
@@ -89,13 +110,12 @@ namespace WinFormTestApp
         int mAnalogSamplesPerMocpaFrame = 0;
         int mDroppedFrames = 0;
         int mLastFrame = 0;
-
-        private static object syncLock = new object();
-        private delegate void OutputMessageCallback(string strMessage);
-        private bool needMarkerListUpdate = false;
-        private bool mPaused = false;
+        int mUIBusyCount = 0;
+        bool mNeedTrackingListUpdate = false;
 
         // UI updating
+        private delegate void OutputMessageCallback(string strMessage);
+        private bool mPaused = false;
         delegate void UpdateUICallback();
         bool mApplicationRunning = true;
         Thread UIUpdateThread;
@@ -105,6 +125,7 @@ namespace WinFormTestApp
         Thread pollThread;
         bool mPolling = false;
 
+        // recording
         bool mRecording = false;
         TextWriter mWriter;
 
@@ -116,6 +137,20 @@ namespace WinFormTestApp
 
         private void Form1_Load(object sender, EventArgs e)
         {
+            m_Discovery.OnServerDiscovered += delegate( NatNetML.DiscoveredServer server )
+            {
+                OutputMessage( String.Format(
+                    "Discovered server: {0} {1}.{2} at {3} (local interface: {4})",
+                    server.ServerDesc.HostApp,
+                    server.ServerDesc.HostAppVersion[0],
+                    server.ServerDesc.HostAppVersion[1],
+                    server.ServerAddress,
+                    server.LocalAddress
+                ) );
+            };
+
+            m_Discovery.StartDiscovery();
+
             // Show available ip addresses of this machine
             String strMachineName = Dns.GetHostName();
             IPHostEntry ipHost = Dns.GetHostByName(strMachineName);
@@ -128,12 +163,9 @@ namespace WinFormTestApp
             comboBoxLocal.SelectedItem = comboBoxLocal.Items[selected];
 
             // create NatNet client
-            int iConnectionType = 0;
-            if (RadioUnicast.Checked)
-                iConnectionType = 1;
-            int iResult = CreateClient(iConnectionType);
+            int iResult = CreateClient();
 
-            // create data chart
+            // create graph
             chart1.Series.Clear();
             for (int i = 0; i < maxSeriesCount; i++)
             {
@@ -142,6 +174,14 @@ namespace WinFormTestApp
                 chart1.Series[i].Points.Clear();
             }
             chart1.ChartAreas[0].CursorX.IsUserSelectionEnabled = true;
+
+            // DataGrid 
+            // enable double buffering on DataGridView to optimize cell redraws
+            Type dgvType = dataGridView1.GetType();
+            System.Reflection.PropertyInfo pi = dgvType.GetProperty("DoubleBuffered", BindingFlags.Instance | BindingFlags.NonPublic);
+            pi.SetValue(dataGridView1, true, null);
+            // preserve height
+            minGridHeight = dataGridView1.Height;
 
             // create and run an Update UI thread
             UpdateUICallback d = new UpdateUICallback(UpdateUI);
@@ -163,7 +203,7 @@ namespace WinFormTestApp
             });
             UIUpdateThread.Start();
 
-            // create and run a polling thread
+            // (optional) create and run a polling thread for polling-driven data access option (instead of event callback driven )
             PollCallback pd = new PollCallback(PollData);
             pollThread = new Thread(() =>
             {
@@ -189,16 +229,16 @@ namespace WinFormTestApp
         /// </summary>
         /// <param name="iConnectionType">0 = Multicast, 1 = Unicast</param>
         /// <returns></returns>
-        private int CreateClient(int iConnectionType)
+        private int CreateClient()
         {
             // release any previous instance
             if (m_NatNet != null)
             {
-                m_NatNet.Uninitialize();
+                m_NatNet.Disconnect();
             }
 
             // [NatNet] create a new NatNet instance
-            m_NatNet = new NatNetML.NatNetClientML(iConnectionType);
+            m_NatNet = new NatNetML.NatNetClientML();
 
             // [NatNet] set a "Frame Ready" callback function (event handler) handler that will be
             // called by NatNet when NatNet receives a frame of data from the server application
@@ -227,9 +267,16 @@ namespace WinFormTestApp
             int returnCode = 0;
             string strLocalIP = comboBoxLocal.SelectedItem.ToString();
             string strServerIP = textBoxServer.Text;
-            returnCode = m_NatNet.Initialize(strLocalIP, strServerIP);
+
+            NatNetClientML.ConnectParams connectParams = new NatNetClientML.ConnectParams();
+            connectParams.ConnectionType = RadioUnicast.Checked ? ConnectionType.Unicast : ConnectionType.Multicast;
+            connectParams.ServerAddress = strServerIP;
+            connectParams.LocalAddress = strLocalIP;
+            returnCode = m_NatNet.Connect( connectParams );
             if (returnCode == 0)
-                OutputMessage("Initialization Succeeded.");
+            {
+                OutputMessage( "Initialization Succeeded." );
+            }
             else
             {
                 OutputMessage("Error Initializing.");
@@ -249,7 +296,6 @@ namespace WinFormTestApp
                 // Tracking Tools and Motive report in meters - lets convert to millimeters
                 if (desc.HostApp.Contains("TrackingTools") || desc.HostApp.Contains("Motive"))
                     m_ServerToMillimeters = 1000.0f;
-
 
                 // [NatNet] [optional] Query mocap server for the current camera framerate
                 int nBytes = 0;
@@ -293,9 +339,15 @@ namespace WinFormTestApp
                 }
 
 
-                m_fCurrentMocapFrameTimestamp = 0.0f;
-                m_fFirstMocapFrameTimestamp = 0.0f;
                 mDroppedFrames = 0;
+                lock(FrontQueueLock)
+                {
+                    m_FrontQueue.Clear();
+                }
+                lock (BackQueueLock)
+                {
+                    m_BackQueue.Clear();
+                }
             }
             else
             {
@@ -319,7 +371,7 @@ namespace WinFormTestApp
 
             }
             // shutdown our client socket
-            m_NatNet.Uninitialize();
+            m_NatNet.Disconnect();
             checkBoxConnect.Text = "Connect";
         }
 
@@ -387,7 +439,7 @@ namespace WinFormTestApp
         private void UpdateChart(long iFrame)
         {
             // Lets only show 500 frames at a time
-            iFrame %= GraphFrames;
+            iFrame = iFrame % GraphFrames;
 
             // clear graph if we've wrapped, allow for fudge
             if ((m_iLastFrameNumber - iFrame) > 400)
@@ -437,9 +489,9 @@ namespace WinFormTestApp
                         int rowIndex = (int)htMarkers[key];
                         if (rowIndex >= 0)
                         {
-                            dataGridView1.Rows[rowIndex].Cells[1].Value = ms.Markers[j].x;
-                            dataGridView1.Rows[rowIndex].Cells[2].Value = ms.Markers[j].y;
-                            dataGridView1.Rows[rowIndex].Cells[3].Value = ms.Markers[j].z;
+                            dataGridView1.Rows[rowIndex].Cells[1].Value = ms.Markers[j].x * m_ServerToMillimeters;
+                            dataGridView1.Rows[rowIndex].Cells[2].Value = ms.Markers[j].y * m_ServerToMillimeters;
+                            dataGridView1.Rows[rowIndex].Cells[3].Value = ms.Markers[j].z * m_ServerToMillimeters;
                         }
                     }
                 }
@@ -450,48 +502,16 @@ namespace WinFormTestApp
             {
                 NatNetML.RigidBodyData rb = m_FrameOfData.RigidBodies[i];
                 int key = rb.ID.GetHashCode();
-
-                // note : must add rb definitions here one time instead of on get data descriptions because we don't know the marker list yet.
-                if (!htRigidBodies.ContainsKey(key))
+                int rowIndex = -1;
+                if (htRigidBodies.ContainsKey(key))
                 {
-                    // Add RigidBody def to the grid
-                    if ((rb.Markers[0] != null) && (rb.Markers[0].ID != -1))
-                    {
-                        string name;
-                        RigidBody rbDef = FindRB(rb.ID);
-                        if (rbDef != null)
-                        {
-                            name = rbDef.Name;
-                        }
-                        else
-                        {
-                            name = rb.ID.ToString();
-                        }
-
-                        int rowIndex = dataGridView1.Rows.Add("RigidBody: " + name);
-                        key = rb.ID.GetHashCode();
-                        htRigidBodies.Add(key, rowIndex);
-                        
-                        // Add Markers associated with this rigid body to the grid
-                        for (int j = 0; j < rb.nMarkers; j++)
-                        {
-                            String strUniqueName = name + "-" + rb.Markers[j].ID.ToString();
-                            int keyMarker = strUniqueName.GetHashCode();
-                            int newRowIndexMarker = dataGridView1.Rows.Add(strUniqueName);
-                            htMarkers.Add(keyMarker, newRowIndexMarker);
-                        }
-                    }
-                }
-                else
-                {
-                    // update RigidBody data
-                    int rowIndex = (int)htRigidBodies[key];
+                    rowIndex = (int)htRigidBodies[key];
                     if (rowIndex >= 0)
                     {
                         bool tracked = rb.Tracked;
                         if (!tracked)
                         {
-                            OutputMessage("RigidBody not tracked in this frame.");
+                            //OutputMessage("RigidBody not tracked in this frame.");
                         }
 
                         dataGridView1.Rows[rowIndex].Cells[1].Value = rb.x * m_ServerToMillimeters;
@@ -501,54 +521,14 @@ namespace WinFormTestApp
                         // Convert quaternion to eulers.  Motive coordinate conventions: X(Pitch), Y(Yaw), Z(Roll), Relative, RHS
                         float[] quat = new float[4] { rb.qx, rb.qy, rb.qz, rb.qw };
                         float[] eulers = new float[3];
-                        eulers = m_NatNet.QuatToEuler(quat, (int)NATEulerOrder.NAT_XYZr);
+                        eulers = NatNetClientML.QuatToEuler(quat, NATEulerOrder.NAT_XYZr);
                         double x = RadiansToDegrees(eulers[0]);     // convert to degrees
                         double y = RadiansToDegrees(eulers[1]);
                         double z = RadiansToDegrees(eulers[2]);
 
-                        /*
-                        if (m_UpAxis == 2)
-                        {
-                            double yOriginal = y;
-                            y = -z;
-                            z = yOriginal;
-                        }
-                        */
-
-
                         dataGridView1.Rows[rowIndex].Cells[4].Value = x;
                         dataGridView1.Rows[rowIndex].Cells[5].Value = y;
                         dataGridView1.Rows[rowIndex].Cells[6].Value = z;
-
-                        // update Marker data associated with this rigid body
-                        for (int j = 0; j < rb.nMarkers; j++)
-                        {
-                            if (rb.Markers[j].ID != -1)
-                            {
-                                string name;
-                                RigidBody rbDef = FindRB(rb.ID);
-                                if (rbDef != null)
-                                {
-                                    name = rbDef.Name;
-                                }
-                                else
-                                {
-                                    name = rb.ID.ToString();
-                                }
-
-                                String strUniqueName = name + "-" + rb.Markers[j].ID.ToString();
-                                int keyMarker = strUniqueName.GetHashCode();
-                                if (htMarkers.ContainsKey(keyMarker))
-                                {
-                                    int rowIndexMarker = (int)htMarkers[keyMarker];
-                                    NatNetML.Marker m = rb.Markers[j];
-                                    dataGridView1.Rows[rowIndexMarker].Cells[1].Value = m.x;
-                                    dataGridView1.Rows[rowIndexMarker].Cells[2].Value = m.y;
-                                    dataGridView1.Rows[rowIndexMarker].Cells[3].Value = m.z;
-                                }
-
-                            }
-                        }
                     }
                 }
             }
@@ -567,44 +547,20 @@ namespace WinFormTestApp
                     int rigidBodyID = LowWord(rb.ID);
                     int uniqueID = skeletonID * 1000 + rigidBodyID;
                     int key = uniqueID.GetHashCode();
-                    
-                    // note : must add rb definitions here one time instead of on get data descriptions because we don't know the marker list yet.
-                    if (!htRigidBodies.ContainsKey(key))
+                    int rowIndex = -1;
+                    if (htRigidBodies.ContainsKey(key))
                     {
-                        // Add RigidBody def to the grid
-                        if ( (rb.Markers[0] != null) && (rb.Markers[0].ID != -1))
-                        {
-                            int key1 = sk.ID * 1000 + rigidBodyID;
-                            RigidBody rbDef = (RigidBody) htSkelRBs[key1];
-                            if (rbDef != null)
-                            {
-                                int rowIndex = dataGridView1.Rows.Add("Bone: " + rbDef.Name);
-                                htRigidBodies.Add(key, rowIndex);
-                                // Add Markers associated with this rigid body to the grid
-                                for (int k = 0; k < rb.nMarkers; k++)
-                                {
-                                    String strUniqueName = rbDef.Name + "-" + rb.Markers[k].ID.ToString();
-                                    int keyMarker = strUniqueName.GetHashCode();
-                                    int newRowIndexMarker = dataGridView1.Rows.Add(strUniqueName);
-                                    htMarkers.Add(keyMarker, newRowIndexMarker);
-                                }
-
-                            }
-                        }
-                    }
-                    else 
-                    {
-                        int rowIndex = (int)htRigidBodies[key];
+                        rowIndex = (int)htRigidBodies[key];
                         if (rowIndex >= 0)
                         {
-                            dataGridView1.Rows[rowIndex].Cells[1].Value = rb.x;
-                            dataGridView1.Rows[rowIndex].Cells[2].Value = rb.y;
-                            dataGridView1.Rows[rowIndex].Cells[3].Value = rb.z;
+                            dataGridView1.Rows[rowIndex].Cells[1].Value = rb.x * m_ServerToMillimeters;
+                            dataGridView1.Rows[rowIndex].Cells[2].Value = rb.y * m_ServerToMillimeters;
+                            dataGridView1.Rows[rowIndex].Cells[3].Value = rb.z * m_ServerToMillimeters;
 
                             // Convert quaternion to eulers.  Motive coordinate conventions: X(Pitch), Y(Yaw), Z(Roll), Relative, RHS
                             float[] quat = new float[4] { rb.qx, rb.qy, rb.qz, rb.qw };
                             float[] eulers = new float[3];
-                            eulers = m_NatNet.QuatToEuler(quat, (int)NATEulerOrder.NAT_XYZr);
+                            eulers = NatNetClientML.QuatToEuler(quat, NATEulerOrder.NAT_XYZr);
                             double x = RadiansToDegrees(eulers[0]);     // convert to degrees
                             double y = RadiansToDegrees(eulers[1]);
                             double z = RadiansToDegrees(eulers[2]);
@@ -613,25 +569,6 @@ namespace WinFormTestApp
                             dataGridView1.Rows[rowIndex].Cells[5].Value = y;
                             dataGridView1.Rows[rowIndex].Cells[6].Value = z;
 
-                            // Marker data associated with this rigid body
-                            int key1 = sk.ID * 1000 + rigidBodyID;
-                            RigidBody rbDef = (RigidBody)htSkelRBs[key1];
-                            if (rbDef != null)
-                            {
-                                for (int k = 0; k < rb.nMarkers; k++)
-                                {
-                                    String strUniqueName = rbDef.Name + "-" + rb.Markers[k].ID.ToString();
-                                    int keyMarker = strUniqueName.GetHashCode();
-                                    if (htMarkers.ContainsKey(keyMarker))
-                                    {
-                                        int rowIndexMarker = (int)htMarkers[keyMarker];
-                                        NatNetML.Marker m = rb.Markers[k];
-                                        dataGridView1.Rows[rowIndexMarker].Cells[1].Value = m.x;
-                                        dataGridView1.Rows[rowIndexMarker].Cells[2].Value = m.y;
-                                        dataGridView1.Rows[rowIndexMarker].Cells[3].Value = m.z;
-                                    }
-                                }
-                            }
                         }
                     }
                 }
@@ -656,71 +593,156 @@ namespace WinFormTestApp
                 }
             }
 
+            // update Device data
+            if (htDevices.Count > 0)
+            {
+                for (int i = 0; i < m_FrameOfData.nDevices; i++)
+                {
+                    NatNetML.DeviceData device = m_FrameOfData.Devices[i];
+                    int key = device.ID.GetHashCode();
+                    int rowIndex = (int)htDevices[key];
+                    if (rowIndex >= 0)
+                    {
+                        for (int iChannel = 0; iChannel < device.nChannels; iChannel++)
+                        {
+                            if (device.ChannelData[iChannel].nFrames > 0)
+                                dataGridView1.Rows[rowIndex].Cells[iChannel + 1].Value = device.ChannelData[iChannel].Values[0];
+                        }
+                    }
+                }
+            }
+
             // update labeled markers data
             // remove previous dynamic marker list
-            // for testing only - this simple approach to grid updating too slow for large marker count use
-            int rowOffset = htMarkers.Count + htRigidBodies.Count + htForcePlates.Count + 1;
+            int currentRow = m_FrameOfData.nMarkerSets + htMarkers.Count + htRigidBodies.Count + htRigidBodyMarkers.Count + htForcePlates.Count + htDevices.Count + 1;
             int labeledCount = 0;
-            if (false)
+            if (LabeledMarkersCheckBox.Checked)
             {
-                int nTotalRows = dataGridView1.Rows.Count;
-                for (int i = rowOffset; i < nTotalRows; i++)
-                    dataGridView1.Rows.RemoveAt(rowOffset);
+                int assetID, memberID;
+                string name;
                 for (int i = 0; i < m_FrameOfData.nMarkers; i++)
                 {
                     NatNetML.Marker m = m_FrameOfData.LabeledMarkers[i];
 
-                    int modelID, markerID;
-                    m_NatNet.DecodeID(m.ID, out modelID, out markerID);
-                    string name = "Labeled Marker (ModelID: " + modelID + "  MarkerID: " + markerID + ")";
-                    if (modelID == 0)
-                        name = "UnLabeled Marker ( ID: " + markerID + ")";
-                    int rowIndex = dataGridView1.Rows.Add(name);
-                    dataGridView1.Rows[rowIndex].Cells[1].Value = m.x;
-                    dataGridView1.Rows[rowIndex].Cells[2].Value = m.y;
-                    dataGridView1.Rows[rowIndex].Cells[3].Value = m.z;
+                    // Marker ID Scheme:
+                    // Active Markers:
+                    //   ID = ActiveID, correlates to RB ActiveLabels list
+                    // Passive Markers: 
+                    //   If Asset with Legacy Labels
+                    //      AssetID 	(Hi Word)
+                    //      MemberID	(Lo Word)
+                    //   Else
+                    //      PointCloud ID
+
+                    bool activeMarker = false;
+                    int activeKey = m.ID.GetHashCode();
+                    if (htRigidBodyMarkers.Contains(activeKey))
+                        activeMarker = true;
+
+                    if(activeMarker)
+                    {
+                        name = "Active Marker: " + m.ID;
+                    }
+                    else
+                    {
+                        NatNetClientML.DecodeID(m.ID, out assetID, out memberID);
+                        int key = assetID.GetHashCode();
+                        if (htRigidBodies.Contains(key) || htSkelRBs.Contains(key))
+                            name = "Passive Marker (AssetID: " + assetID + "  MemberID: " + memberID + ")";
+                        else 
+                            name = "Passive Marker (PointCloud ID: " + m.ID + ")";
+                    }
+
+                    // expand grid if necessary
+                    while (currentRow >= dataGridView1.RowCount)
+                        dataGridView1.Rows.Add();
+
+                    dataGridView1.Rows[currentRow].Cells[0].Value = name;
+                    dataGridView1.Rows[currentRow].Cells[1].Value = m.x * m_ServerToMillimeters;
+                    dataGridView1.Rows[currentRow].Cells[2].Value = m.y * m_ServerToMillimeters;
+                    dataGridView1.Rows[currentRow].Cells[3].Value = m.z * m_ServerToMillimeters;
+                    dataGridView1.Rows[currentRow].Cells[4].Value = m.residual * m_ServerToMillimeters;
+
+                    // Active Markers : Also add to corresponding RigidBody Marker Row
+                    if(activeMarker)
+                    {
+                        int rowIndex = (int)htRigidBodyMarkers[activeKey];
+                        if (rowIndex >= 0)
+                        {
+                            dataGridView1.Rows[rowIndex].Cells[1].Value = m.x * m_ServerToMillimeters;
+                            dataGridView1.Rows[rowIndex].Cells[2].Value = m.y * m_ServerToMillimeters;
+                            dataGridView1.Rows[rowIndex].Cells[3].Value = m.z * m_ServerToMillimeters;
+                        }
+                    }
+
                     labeledCount++;
+                    currentRow++;
                 }
+
             }
 
-            // DEPRECATED
-            // update unlabeled markers data
-            // remove previous dynamic marker list
-            // for testing only - this simple approach to grid updating too slow for large marker count use
-            rowOffset += labeledCount;
-            if (false)
+           // clear any remaining rows ( e.g. from markers not present in this frame)
+            while(currentRow < dataGridView1.RowCount)
             {
-                int nTotalRows = dataGridView1.Rows.Count;
-                for (int i = rowOffset; i < nTotalRows; i++)
-                    dataGridView1.Rows.RemoveAt(rowOffset);
-                for (int i = 0; i < m_FrameOfData.nOtherMarkers; i++)
-                {
-                    NatNetML.Marker m = m_FrameOfData.OtherMarkers[i];
-                    int rowIndex = dataGridView1.Rows.Add("Unlabeled Marker (ID: " + m.ID + ")");
-                    dataGridView1.Rows[rowIndex].Cells[1].Value = m.x;
-                    dataGridView1.Rows[rowIndex].Cells[2].Value = m.y;
-                    dataGridView1.Rows[rowIndex].Cells[3].Value = m.z;
-                }
+                dataGridView1.Rows[currentRow].Cells[0].Value = "";
+                dataGridView1.Rows[currentRow].Cells[1].Value = "";
+                dataGridView1.Rows[currentRow].Cells[2].Value = "";
+                dataGridView1.Rows[currentRow].Cells[3].Value = "";
+                dataGridView1.Rows[currentRow].Cells[4].Value = "";
+                currentRow++;
             }
 
+            // if rows not empty, add frame telemetry to grid, so its graphable
+            if(dataGridView1.Rows.Count > 0)
+            {
+                // Update the interframe duration
+                dataGridView1.Rows[0].Cells[7].Value = interframeDuration;
+                // Update Frame drop detection
+                dataGridView1.Rows[0].Cells[8].Value = droppedFrameIndicator;
 
+                // System latency
+                bool bSystemLatencyAvailable = m_FrameOfData.CameraMidExposureTimestamp != 0;
+                double systemLatencyMs = bSystemLatencyAvailable ?
+                    (m_FrameOfData.TransmitTimestamp - m_FrameOfData.CameraMidExposureTimestamp) / (double)desc.HighResClockFrequency * 1000.0
+                    : 0.0;
+                dataGridView1.Rows[0].Cells[9].Value = systemLatencyMs.ToString( "F3" );
+
+                // Software latency
+                bool bSoftwareLatencyAvailable = m_FrameOfData.CameraDataReceivedTimestamp != 0;
+                double softwareLatencyMs = bSoftwareLatencyAvailable ?
+                    (m_FrameOfData.TransmitTimestamp - m_FrameOfData.CameraDataReceivedTimestamp) / (double)desc.HighResClockFrequency * 1000.0
+                    : 0.0;
+                dataGridView1.Rows[0].Cells[10].Value = softwareLatencyMs.ToString( "F3" );
+
+                // Transit latency (time between NatNet server frame transmission and client reception)
+                double transitLatencyMs = m_FrameOfDataTransitLatency * 1000.0;
+                dataGridView1.Rows[0].Cells[11].Value = transitLatencyMs.ToString( "F3" );
+            }
+
+            if ( dataGridView1.Rows.Count != mLastRowCount )
+            {
+                mLastRowCount = dataGridView1.Rows.Count;
+                int newHeight = (dataGridView1.CurrentRow.Height+1) * mLastRowCount + 5;
+                newHeight = Math.Max(newHeight, minGridHeight);
+                dataGridView1.Height = newHeight;
+            }
         }
 
         /// <summary>
         /// [NatNet] Request a description of the Active Model List from the server (e.g. Motive) and build up a new spreadsheet  
         /// </summary>
-        /// <param name="sender"></param>
-        /// <param name="e"></param>
-        private void buttonGetDataDescriptions_Click(object sender, EventArgs e)
+        private void GetDataDescriptions()
         {
             mForcePlates.Clear();
             htForcePlates.Clear();
+            mDevices.Clear();
+            htDevices.Clear();
             mRigidBodies.Clear();
             dataGridView1.Rows.Clear();
             htMarkers.Clear();
             htRigidBodies.Clear();
+            htRigidBodyMarkers.Clear();
             htSkelRBs.Clear();
-            needMarkerListUpdate = true;
 
             OutputMessage("Retrieving Data Descriptions....");
             List<NatNetML.DataDescriptor> descs = new List<NatNetML.DataDescriptor>();
@@ -752,6 +774,7 @@ namespace WinFormTestApp
                             htMarkers.Add(key, rowIndex);
                         }
                     }
+
                     // RigidBodies
                     else if (d.type == (int)NatNetML.DataDescriptorType.eRigidbodyData)
                     {
@@ -767,7 +790,7 @@ namespace WinFormTestApp
 
                         mRigidBodies.Add(rb);
 
-                        int rowIndex = dataGridView1.Rows.Add("RigidBody: " + rb.Name);
+                        int rowIndex = dataGridView1.Rows.Add("RigidBody: " + rb.Name + " (ID:"+rb.ID+")");
                         // RigidBodyIDToRow map
                         int key = rb.ID.GetHashCode();
                         try
@@ -779,7 +802,19 @@ namespace WinFormTestApp
                             MessageBox.Show("Duplicate RigidBody ID Detected : " + ex.Message);
                         }
 
+                        // RigidBody Markers
+                        for (int i = 0; i < rb.nMarkers; i++)
+                        {
+                            // Uses Active Markers?
+                            if (rb.MarkerRequiredLabels[i] > 0)
+                            {
+                                key = rb.MarkerRequiredLabels[i].GetHashCode();
+                                int markerRowIndex = dataGridView1.Rows.Add("Marker " + rb.MarkerRequiredLabels[i]);
+                                htRigidBodyMarkers.Add(key, markerRowIndex);
+                            }
+                        }
                     }
+
                     // Skeletons
                     else if (d.type == (int)NatNetML.DataDescriptorType.eSkeletonData)
                     {
@@ -815,12 +850,13 @@ namespace WinFormTestApp
 
                         }
                     }
+
                     // ForcePlates
                     else if (d.type == (int)NatNetML.DataDescriptorType.eForcePlateData)
                     {
                         NatNetML.ForcePlate fp = (NatNetML.ForcePlate)d;
 
-                        
+
                         OutputMessage("Data Def " + iObject.ToString() + " [ForcePlate]");
                         OutputMessage(" Name : " + fp.Serial);
                         OutputMessage(" ID : " + fp.ID);
@@ -835,6 +871,26 @@ namespace WinFormTestApp
                         htForcePlates.Add(key, rowIndex);
                     }
 
+                    // Devices
+                    else if (d.type == (int)NatNetML.DataDescriptorType.eDeviceData)
+                    {
+                        NatNetML.Device device = (NatNetML.Device)d;
+
+                        OutputMessage("Data Def " + iObject.ToString() + " [Device]");
+                        OutputMessage(" Name : " + device.Name);
+                        OutputMessage(" Serial : " + device.Serial);
+                        OutputMessage(" ID : " + device.ID);
+                        OutputMessage(" Channels : " + device.ChannelCount);
+                        for (int i = 0; i < device.ChannelCount; i++)
+                        {
+                            OutputMessage("  " + device.ChannelNames[i]);
+                        }
+                        mDevices.Add(device);
+
+                        int rowIndex = dataGridView1.Rows.Add("Device: " + device.Name);
+                        int key = device.ID.GetHashCode();
+                        htDevices.Add(key, rowIndex);
+                    }
                     else
                     {
                         OutputMessage("Unknown DataType");
@@ -845,6 +901,11 @@ namespace WinFormTestApp
             {
                 OutputMessage("Unable to retrieve DataDescriptions");
             }
+        }
+
+        private void buttonGetDataDescriptions_Click(object sender, EventArgs e)
+        {
+            GetDataDescriptions();
         }
 
         void ProcessFrameOfData(ref NatNetML.FrameOfMocapData data)
@@ -859,6 +920,11 @@ namespace WinFormTestApp
                 {
                     //OutputMessage("Frame Drop: ( ThisTS: " + data.fTimestamp.ToString("F3") + "  LastTS: " + m_fLastFrameTimestamp.ToString("F3") + " )");
                     mDroppedFrames++;
+                    droppedFrameIndicator = 10;
+                }
+                else
+                {
+                    droppedFrameIndicator = 0;
                 }
             }
 
@@ -872,20 +938,54 @@ namespace WinFormTestApp
                 }
             }
 
+            if (data.bTrackingModelsChanged)
+                mNeedTrackingListUpdate = true;
+
+            // NatNet manages the incoming frame of mocap data, so if we want to keep it, we must make a copy of it
+            FrameOfMocapData deepCopy = new FrameOfMocapData(data);
+            
+            // Add frame to a background queue for access by other threads
+            // Note: this lock should always succeed immediately, unless connecting/disconnecting, when the queue gets reset
+            lock(BackQueueLock)
+            {
+                m_BackQueue.Enqueue(deepCopy);
+
+                // limit background queue size to 10 frames
+                while(m_BackQueue.Count > 10)
+                {
+                    m_BackQueue.Dequeue();
+                }
+            }
+
+            // Update the shared UI queue, only if the UI thread is not updating (we don't want to wait here as we're in the data update thread)
+            bool lockAcquired = false;
+            try
+            {
+                Monitor.TryEnter(FrontQueueLock, ref lockAcquired);
+                if (lockAcquired)
+                {
+                    // [optional] clear the frame queue before adding a new frame (UI only wants most recent frame)
+                    m_FrontQueue.Clear();
+                    m_FrontQueue.Enqueue(deepCopy);
+                
+                    m_FrameTransitLatencies.Clear();
+                    m_FrameTransitLatencies.Enqueue( m_NatNet.SecondsSinceHostTimestamp( data.TransmitTimestamp ) );
+                }
+                else 
+                {
+                    mUIBusyCount++;
+                }
+            }
+            finally
+            {
+                if(lockAcquired)
+                    Monitor.Exit(FrontQueueLock);
+            }
+
             // recording : write packet to data file
             if (mRecording)
             {
-                WriteFrame(data);
-            }
-
-            // [NatNet] Add the incoming frame of mocap data to our frame queue,  
-            // Note: the frame queue is a shared resource with the UI thread, so lock it while writing
-            lock (syncLock)
-            {
-                // [optional] clear the frame queue before adding a new frame
-                m_FrameQueue.Clear();
-                FrameOfMocapData deepCopy = new FrameOfMocapData(data);
-                m_FrameQueue.Enqueue(deepCopy);
+                WriteFrame(deepCopy);
             }
 
             mLastFrame = data.iFrame;
@@ -911,26 +1011,28 @@ namespace WinFormTestApp
         /// <param name="client">The NatNet client instance</param>
         void m_NatNet_OnFrameReady(NatNetML.FrameOfMocapData data, NatNetML.NatNetClientML client)
         {
-            double elapsedIntraMS = 0.0f;
-            QueryPerfCounter intraTimer = new QueryPerfCounter();
-            intraTimer.Start();
-
-            // detect and report and 'measured' frame drop (as measured by client)
+            // measure time between frame arrival (inter frame)
             m_FramePeriodTimer.Stop();
-            double elapsedMS = m_FramePeriodTimer.Duration();
+            interframeDuration = m_FramePeriodTimer.Duration();
 
+            // measure processing time (intra frame)
+            m_ProcessingTimer.Start();
+
+            // process data
+            // NOTE!  do as little as possible here as we're on the data servicing thread
             ProcessFrameOfData(ref data);
 
-            // report if we are taking too long, which blocks packet receiving, which if long enough would result in socket buffer drop
-            intraTimer.Stop();
-            elapsedIntraMS = intraTimer.Duration();
-            if (elapsedIntraMS > 5.0f)
+            // report if we are taking longer than a mocap frame time
+            // which eventually will back up the network receive buffer and result in frame drop
+            m_ProcessingTimer.Stop();
+            double appProcessingTimeMSecs = m_ProcessingTimer.Duration();
+            double mocapFramePeriodMSecs = (1.0f / m_ServerFramerate) * 1000.0f;
+            if (appProcessingTimeMSecs > mocapFramePeriodMSecs)
             {
-                OutputMessage("Warning : Frame handler taking too long: " + elapsedIntraMS.ToString("F2"));
+                OutputMessage("Warning : Frame handler taking longer than frame period: " + appProcessingTimeMSecs.ToString("F2"));
             }
 
             m_FramePeriodTimer.Start();
-
         }
 
         // [NatNet] [optional] alternate function signatured frame ready callback handler for .NET applications/hosts
@@ -972,6 +1074,7 @@ namespace WinFormTestApp
             FrameOfMocapData data = m_NatNet.GetLastFrameOfData();
             ProcessFrameOfData(ref data);
         }
+
 
         private void GetLastFrameOfDataButton_Click(object sender, EventArgs e)
         {
@@ -1045,7 +1148,7 @@ namespace WinFormTestApp
                 }
                 catch (System.Exception ex)
                 {
-                	
+                    OutputMessage("Record Error : " + ex.Message);
                 }
             }
             else
@@ -1058,41 +1161,29 @@ namespace WinFormTestApp
 
         private void UpdateUI()
         {
-            m_UIUpdateTimer.Stop();
-            double interframeDuration = m_UIUpdateTimer.Duration();
-
-            QueryPerfCounter uiIntraFrameTimer = new QueryPerfCounter();
-            uiIntraFrameTimer.Start();
-
-            // the frame queue is a shared resource with the FrameOfMocap delivery thread, so lock it while reading
-            // note this can block the frame delivery thread.  In a production application frame queue management would be optimized.
-            lock (syncLock)
+            // The frame queue is a shared resource with the FrameOfMocap delivery thread, so lock it while reading
+            bool lockAcquired = false;
+            try
             {
-                while (m_FrameQueue.Count > 0)
+                if(mNeedTrackingListUpdate)
                 {
-                    m_FrameOfData = m_FrameQueue.Dequeue();
+                    GetDataDescriptions();
+                    mNeedTrackingListUpdate = false;
+                }
 
-                    if (m_FrameQueue.Count > 0)
-                        continue;
-
-                    if (m_FrameOfData != null)
+                Monitor.TryEnter(FrontQueueLock, ref lockAcquired);
+                if (lockAcquired)
+                {
+                    if (m_FrontQueue.Count > 0)
                     {
-                        // for servers that only use timestamps, not frame numbers, calculate a 
-                        // frame number from the time delta between frames
-                        if (desc.HostApp.Contains("TrackingTools"))
-                        {
-                            m_fCurrentMocapFrameTimestamp = m_FrameOfData.fLatency;
-                            if (m_fCurrentMocapFrameTimestamp == m_fLastFrameTimestamp)
-                            {
-                                continue;
-                            }
-                            if (m_fFirstMocapFrameTimestamp == 0.0f)
-                            {
-                                m_fFirstMocapFrameTimestamp = m_fCurrentMocapFrameTimestamp;
-                            }
-                            m_FrameOfData.iFrame = (int)((m_fCurrentMocapFrameTimestamp - m_fFirstMocapFrameTimestamp) * m_ServerFramerate);
+                        // policy: only draw the most recent frame in queue, discard the rest
+                        while(m_FrontQueue.Count > 0)
+                            m_FrameOfData = m_FrontQueue.Dequeue();
+                        while (m_FrameTransitLatencies.Count > 0)
+                            m_FrameOfDataTransitLatency = m_FrameTransitLatencies.Dequeue();
 
-                        }
+                        Monitor.Exit(FrontQueueLock);
+                        lockAcquired = false;
 
                         // update the data grid
                         UpdateDataGrid();
@@ -1100,23 +1191,19 @@ namespace WinFormTestApp
                         // update the chart
                         UpdateChart(m_FrameOfData.iFrame);
 
-                        // only redraw chart when necessary, not for every frame
-                        if (m_FrameQueue.Count == 0)
-                        {
-                            chart1.ChartAreas[0].RecalculateAxesScale();
-                            chart1.ChartAreas[0].AxisX.Minimum = 0;
-                            chart1.ChartAreas[0].AxisX.Maximum = GraphFrames;
-                            chart1.Invalidate();
-                        }
+                        // redraw the chart
+                        chart1.ChartAreas[0].RecalculateAxesScale();
+                        chart1.ChartAreas[0].AxisX.Minimum = 0;
+                        chart1.ChartAreas[0].AxisX.Maximum = GraphFrames;
+                        chart1.Invalidate();
 
                         // Mocap server timestamp (in seconds)
-                        //m_fLastFrameTimestamp = m_FrameOfData.fTimestamp;
                         TimestampValue.Text = m_FrameOfData.fTimestamp.ToString("F3");
                         DroppedFrameCountLabel.Text = mDroppedFrames.ToString();
 
                         // SMPTE timecode (if timecode generator present)
                         int hour, minute, second, frame, subframe;
-                        bool bSuccess = m_NatNet.DecodeTimecode(m_FrameOfData.Timecode, m_FrameOfData.TimecodeSubframe, out hour, out minute, out second, out frame, out subframe);
+                        bool bSuccess = NatNetClientML.DecodeTimecode(m_FrameOfData.Timecode, m_FrameOfData.TimecodeSubframe, out hour, out minute, out second, out frame, out subframe);
                         if (bSuccess)
                             TimecodeValue.Text = string.Format("{0:D2}:{1:D2}:{2:D2}:{3:D2}.{4:D2}", hour, minute, second, frame, subframe);
 
@@ -1127,13 +1214,15 @@ namespace WinFormTestApp
                     }
                 }
             }
-
-            uiIntraFrameTimer.Stop();
-            double uiIntraFrameDuration = uiIntraFrameTimer.Duration();
-            m_UIUpdateTimer.Start();
+            finally 
+            {
+                if (lockAcquired)
+                {
+                    Monitor.Exit(FrontQueueLock);
+                }
+            }
 
         }
-
 
         public int LowWord(int number)
         {
@@ -1154,16 +1243,17 @@ namespace WinFormTestApp
         {
             mApplicationRunning = false;
 
+            m_Discovery.EndDiscovery();
+
             if(UIUpdateThread.IsAlive)
                 UIUpdateThread.Abort();
 
-            m_NatNet.Uninitialize();
+            m_NatNet.Disconnect();
         }
 
         private void RadioMulticast_CheckedChanged(object sender, EventArgs e)
         {
             bool bNeedReconnect = checkBoxConnect.Checked;
-            int iResult = CreateClient(0);
             if (bNeedReconnect)
                 Connect();
         }
@@ -1171,7 +1261,6 @@ namespace WinFormTestApp
         private void RadioUnicast_CheckedChanged(object sender, EventArgs e)
         {
             bool bNeedReconnect = checkBoxConnect.Checked;
-            int iResult = CreateClient(1);
             if (bNeedReconnect)
                 Connect();
         }
@@ -1442,13 +1531,97 @@ namespace WinFormTestApp
             }
         }
 
-
-
         private void PollCheckBox_CheckedChanged(object sender, EventArgs e)
         {
             SetDataPolling(PollCheckBox.Checked);
         }
 
+        private void SetPropertyButton_Click(object sender, EventArgs e)
+        {
+            int nBytes = 0;
+            byte[] response = new byte[10000];
+            string command = "SetProperty," + NodeNameText.Text + "," + PropertyNameText.Text + "," + PropertyValueText.Text;
+            int rc = m_NatNet.SendMessageAndWait(command, out response, out nBytes);
+            if (rc != 0)
+            {
+                OutputMessage(command + " not handled by server");
+            }
+            else
+            {
+                int opResult = System.BitConverter.ToInt32(response, 0);
+                if (opResult == 0)
+                    OutputMessage(command + " handled and succeeded.");
+                else
+                    OutputMessage(command + " handled but failed.");
+            }
+        }
+
+        private void GetPropertyButton_Click(object sender, EventArgs e)
+        {
+            int nBytes = 0;
+            byte[] response = new byte[10000];
+            string command = "GetProperty," + NodeNameText.Text + "," + PropertyNameText.Text;
+            int rc = m_NatNet.SendMessageAndWait(command, out response, out nBytes);
+            if (rc != 0)
+            {
+                OutputMessage(command + " not handled by server");
+            }
+            else
+            {
+                System.Text.Encoding encoding = System.Text.Encoding.UTF8;
+                string result = new string(encoding.GetChars(response));
+                result = result.Trim('\0'); // .NET string are not null terminated
+                if ((result.Length == 0) || (result=="error"))
+                    OutputMessage(command + " handled but failed.");
+                else
+                {
+                    PropertyValueText.Text = result;
+                    OutputMessage(command + " handled and succeeded.");
+                }
+            }
+        }
+
+        private void DisableAssetButton_Click(object sender, EventArgs e)
+        {
+            int nBytes = 0;
+            byte[] response = new byte[10000];
+            string command = "SetProperty," + NodeNameText.Text + "," + "Active,False";
+            int rc = m_NatNet.SendMessageAndWait(command, out response, out nBytes);
+            if (rc != 0)
+            {
+                OutputMessage(command + " not handled by server");
+            }
+            else
+            {
+                int opResult = System.BitConverter.ToInt32(response, 0);
+                if (opResult == 0)
+                    OutputMessage(command + " handled and succeeded.");
+                else
+                    OutputMessage(command + " handled but failed.");
+            }
+        }
+
+        private void EnableAssetButton_Click(object sender, EventArgs e)
+        {
+            int nBytes = 0;
+            byte[] response = new byte[10000];
+            string command = "SetProperty," + NodeNameText.Text + "," + "Active,True";
+            int rc = m_NatNet.SendMessageAndWait(command, out response, out nBytes);
+            if (rc != 0)
+            {
+                OutputMessage(command + " not handled by server");
+            }
+            else
+            {
+                int opResult = System.BitConverter.ToInt32(response, 0);
+                if (opResult == 0)
+                    OutputMessage(command + " handled and succeeded.");
+                else
+                    OutputMessage(command + " handled but failed.");
+            }
+        }
+
+      
     }
 
     // Wrapper class for the windows high performance timer QueryPerfCounter

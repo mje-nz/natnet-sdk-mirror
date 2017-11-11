@@ -59,7 +59,7 @@
   <ItemGroup>
     <Reference Include="NatNetML, Version=2.0.3603.26597, Culture=neutral, processorArchitecture=x86">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\lib\NatNetML.dll</HintPath>
+	  <HintPath>..\..\lib\$(Platform)\NatNetML.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Data" />

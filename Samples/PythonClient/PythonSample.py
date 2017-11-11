@@ -2,7 +2,7 @@
 
 # This is a callback function that gets connected to the NatNet client and called once per mocap frame.
 def receiveNewFrame( frameNumber, markerSetCount, unlabeledMarkersCount, rigidBodyCount, skeletonCount,
-                    labeledMarkerCount, latency, timecode, timecodeSub, timestamp, isRecording, trackedModelsChanged ):
+                    labeledMarkerCount, timecode, timecodeSub, timestamp, isRecording, trackedModelsChanged ):
     print( "Received frame", frameNumber )
 
 # This is a callback function that gets connected to the NatNet client. It is called once per rigid body per frame

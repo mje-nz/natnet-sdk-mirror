@@ -35,6 +35,7 @@ Usage [optional]:
 #include <winsock2.h>
 
 #include "NatNetTypes.h"
+#include "NatNetCAPI.h"
 #include "NatNetClient.h"
 #include "HiTimer.h"
 
@@ -44,7 +45,7 @@ void _WriteHeader(FILE* fp);
 void _WriteFrame(FILE* fp, sFrameOfMocapData* data);
 void _WriteFooter(FILE* fp);
 void __cdecl DataHandler(sFrameOfMocapData* data, void* pUserData);		// receives data from the server
-int CreateClient(int iConnectionType);
+int CreateClient();
 
 int initializeLastFrame = 0;
 double lastfTimeStamp = 0.0;
@@ -71,7 +72,6 @@ bool ready = false;
 int _tmain(int argc, _TCHAR* argv[])
 {
     int iResult;
-    int iConnectionType = ConnectionType_Multicast;
     
     // parse command line args
     if(argc>1)
@@ -96,7 +96,7 @@ int _tmain(int argc, _TCHAR* argv[])
     }
 
     // create NatNet Client
-    iResult = CreateClient(iConnectionType);
+    iResult = CreateClient();
     if(iResult != ErrorCode_OK)
     {
         printf("Error initializing client.  See log for details.  Exiting");
@@ -157,7 +157,7 @@ int _tmain(int argc, _TCHAR* argv[])
 	}
 
 	// done - clean up.
-	theClient->Uninitialize();
+	theClient->Disconnect();
 	_WriteFooter(fp);
 	fclose(fp);
 
@@ -165,28 +165,32 @@ int _tmain(int argc, _TCHAR* argv[])
 }
 
 // Establish a NatNet Client connection
-int CreateClient(int iConnectionType)
+int CreateClient()
 {
     // release previous server
     if(theClient)
     {
-        theClient->Uninitialize();
+        theClient->Disconnect();
         delete theClient;
     }
 
     // create NatNet client
-    theClient = new NatNetClient(iConnectionType);
+    theClient = new NatNetClient();
 
      // print version info
     unsigned char ver[4];
-    theClient->NatNetVersion(ver);
+    NatNet_GetVersion(ver);
     printf("NatNet Timing Client (NatNet ver. %d.%d.%d.%d)\n", ver[0], ver[1], ver[2], ver[3]);
 
     // set callback handlers
-    theClient->SetDataCallback( DataHandler, theClient );	// this function will receive data from the server
+    theClient->SetFrameReceivedCallback( DataHandler, theClient );	// this function will receive data from the server
 
     // initialize a NatNet client and connect it to a NatNet server
-    int retCode = theClient->Initialize(szMyIPAddress, szServerIPAddress);
+    sNatNetClientConnectParams connectParams;
+    connectParams.connectionType = ConnectionType_Multicast;
+    connectParams.localAddress = szMyIPAddress;
+    connectParams.serverAddress = szServerIPAddress;
+    int retCode = theClient->Connect( connectParams );
     if (retCode != ErrorCode_OK)
     {
         printf("Unable to connect to server.  Error code: %d. Exiting", retCode);

@@ -145,7 +145,7 @@ int NATUtils::GetLocalIPAddresses(unsigned long Addresses[], int nMax)
     LPDWORD lpnSize = new DWORD;
     GetComputerName((cpName), lpnSize);
     //GetComputerName(szMyName, &NameLength);
-    if (!(haddr=gethostbyname(szMyName)))
+    if (!(haddr=gethostbyname(cpName)))
     {
         return -1;
     }

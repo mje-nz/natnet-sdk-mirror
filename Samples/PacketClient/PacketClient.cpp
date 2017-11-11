@@ -29,6 +29,7 @@ Usage [optional]:
 */
 
 #include <stdio.h>
+#include <inttypes.h>
 #include <tchar.h>
 #include <conio.h>
 #include <winsock2.h>
@@ -39,8 +40,8 @@ Usage [optional]:
 #define MAX_NAMELENGTH              256
 
 // NATNET message ids
-#define NAT_PING                    0 
-#define NAT_PINGRESPONSE            1
+#define NAT_CONNECT                 0 
+#define NAT_SERVERINFO              1
 #define NAT_REQUEST                 2
 #define NAT_RESPONSE                3
 #define NAT_REQUEST_MODELDEF        4
@@ -73,7 +74,7 @@ typedef struct
         unsigned long  lData[MAX_PACKETSIZE/4];
         float          fData[MAX_PACKETSIZE/4];
         sSender        Sender;
-    } Data;                                 // Payload
+    } Data;                                 // Payload incoming from NatNet Server
 
 } sPacket;
 
@@ -83,8 +84,13 @@ void Unpack(char* pData);
 int GetLocalIPAddresses(unsigned long Addresses[], int nMax);
 int SendCommand(char* szCOmmand);
 
-#define MULTICAST_ADDRESS		"239.255.42.99"     // IANA, local network
+// This should match the multicast address listed in Motive's streaming settings.
+#define MULTICAST_ADDRESS		"239.255.42.99"    
+
+// NatNet Command channel
 #define PORT_COMMAND            1510
+
+// NatNet Data channel
 #define PORT_DATA  			    1511                
 
 SOCKET CommandSocket;
@@ -135,7 +141,7 @@ DWORD WINAPI CommandListenThread(void* dummy)
         case NAT_FRAMEOFDATA:
             Unpack((char*)&PacketIn);
             break;
-        case NAT_PINGRESPONSE:
+        case NAT_SERVERINFO:
             for(int i=0; i<4; i++)
             {
                 NatNetVersion[i] = (int)PacketIn.Data.Sender.NatNetVersion[i];
@@ -167,7 +173,7 @@ DWORD WINAPI CommandListenThread(void* dummy)
     return 0;
 }
 
-// Data listener thread
+// Data listener thread. Listens for incoming bytes from NatNet
 DWORD WINAPI DataListenThread(void* dummy)
 {
     char  szData[20000];
@@ -178,6 +184,7 @@ DWORD WINAPI DataListenThread(void* dummy)
     {
         // Block until we receive a datagram from the network (from anyone including ourselves)
         int nDataBytesReceived = recvfrom(DataSocket, szData, sizeof(szData), 0, (sockaddr *)&TheirAddress, &addr_len);
+        // Once we have bytes recieved Unpack organizes all the data
         Unpack(szData);
     }
 
@@ -351,9 +358,9 @@ int main(int argc, char* argv[])
     HostAddr.sin_port = htons(PORT_COMMAND); 
     HostAddr.sin_addr = ServerAddress;
 
-    // send initial ping command
+    // send initial connect request
     sPacket PacketOut;
-    PacketOut.iMessage = NAT_PING;
+    PacketOut.iMessage = NAT_CONNECT;
     PacketOut.nDataBytes = 0;
     int nTries = 3;
     while (nTries--)
@@ -413,20 +420,6 @@ int main(int argc, char* argv[])
                     break;
             }
             break;	
-        case 'p':
-            // send NAT_MESSAGESTRING (will respond on the "Command Listener" thread)
-            strcpy(szRequest, "Ping");
-            PacketOut.iMessage = NAT_PING;
-            PacketOut.nDataBytes = (int)strlen(szRequest) + 1;
-            strcpy(PacketOut.Data.szData, szRequest);
-            nTries = 3;
-            while (nTries--)
-            {
-                int iRet = sendto(CommandSocket, (char *)&PacketOut, 4 + PacketOut.nDataBytes, 0, (sockaddr *)&HostAddr, sizeof(HostAddr));
-                if(iRet != SOCKET_ERROR)
-                    break;
-            }
-            break;
         case 'w':
             {
                 char szCommand[512];
@@ -507,7 +500,7 @@ int SendCommand(char* szCommand)
     return gCommandResponse;
 }
 
-// convert ip address string to addr
+// Convert IP address string to address
 bool IPAddress_StringToAddr(char *szNameOrAddress, struct in_addr *Address)
 {
 	int retVal;
@@ -522,9 +515,10 @@ bool IPAddress_StringToAddr(char *szNameOrAddress, struct in_addr *Address)
 	saGNI.sin_addr.s_addr = inet_addr(szNameOrAddress);
 	saGNI.sin_port = htons(port);
 
-	// getnameinfo
+	// getnameinfo in WS2tcpip is protocol independent and resolves address to ANSI host name
 	if ((retVal = getnameinfo((SOCKADDR *)&saGNI, sizeof(sockaddr), hostName, 256, servInfo, 256, NI_NUMERICSERV)) != 0)
 	{
+        // Returns error if getnameinfo failed
         printf("[PacketClient] GetHostByAddr failed. Error #: %ld\n", WSAGetLastError());
 		return false;
 	}
@@ -555,6 +549,8 @@ int GetLocalIPAddresses(unsigned long Addresses[], int nMax)
 	aiHints.ai_family = AF_INET;
 	aiHints.ai_socktype = SOCK_DGRAM;
 	aiHints.ai_protocol = IPPROTO_UDP;
+
+    // Take ANSI host name and translates it to an address
 	if ((retVal = getaddrinfo(szMyName, port, &aiHints, &aiList)) != 0) 
 	{
         printf("[PacketClient] getaddrinfo failed. Error #: %ld\n", WSAGetLastError());
@@ -568,6 +564,8 @@ int GetLocalIPAddresses(unsigned long Addresses[], int nMax)
     return 1;
 }
 
+// Funtion that assigns a time code values to 5 variables passed as arguments
+// Requires an integer from the packet as the timecode and timecodeSubframe
 bool DecodeTimecode(unsigned int inTimecode, unsigned int inTimecodeSubframe, int* hour, int* minute, int* second, int* frame, int* subframe)
 {
 	bool bValid = true;
@@ -581,6 +579,7 @@ bool DecodeTimecode(unsigned int inTimecode, unsigned int inTimecodeSubframe, in
 	return bValid;
 }
 
+// Takes timecode and assigns it to a string
 bool TimecodeStringify(unsigned int inTimecode, unsigned int inTimecodeSubframe, char *Buffer, int BufferSize)
 {
 	bool bValid;
@@ -595,9 +594,23 @@ bool TimecodeStringify(unsigned int inTimecode, unsigned int inTimecodeSubframe,
 	return bValid;
 }
 
-
+// *********************************************************************
+//
+//  Unpack Data:
+//      Recieves pointer to bytes that represent a packet of data
+//
+//      There are lots of print statements that show what
+//      data is being stored
+//
+//      Most memcpy functions will assign the data to a variable.
+//      Use this variable at your descretion. 
+//      Variables created for storing data do not exceed the 
+//      scope of this function. 
+//
+// *********************************************************************
 void Unpack(char* pData)
 {
+    // Checks for NatNet Version number. Used later in function. Packets may be different depending on NatNet version.
     int major = NatNetVersion[0];
     int minor = NatNetVersion[1];
 
@@ -605,26 +618,27 @@ void Unpack(char* pData)
 
     printf("Begin Packet\n-------\n");
 
-    // message ID
+    // First 2 Bytes is message ID
     int MessageID = 0;
     memcpy(&MessageID, ptr, 2); ptr += 2;
     printf("Message ID : %d\n", MessageID);
 
-    // size
+    // Second 2 Bytes is the size of the packet
     int nBytes = 0;
     memcpy(&nBytes, ptr, 2); ptr += 2;
     printf("Byte count : %d\n", nBytes);
 	
     if(MessageID == 7)      // FRAME OF MOCAP DATA packet
     {
-        // frame number
+        // Next 4 Bytes is the frame number
         int frameNumber = 0; memcpy(&frameNumber, ptr, 4); ptr += 4;
         printf("Frame # : %d\n", frameNumber);
     	
-	    // number of data sets (markersets, rigidbodies, etc)
+	    // Next 4 Bytes is the number of data sets (markersets, rigidbodies, etc)
         int nMarkerSets = 0; memcpy(&nMarkerSets, ptr, 4); ptr += 4;
         printf("Marker Set Count : %d\n", nMarkerSets);
 
+        // Loop through number of marker sets and get name and data
         for (int i=0; i < nMarkerSets; i++)
         {    
             // Markerset name
@@ -647,7 +661,7 @@ void Unpack(char* pData)
             }
         }
 
-	    // unidentified markers
+	    // Loop through unlabeled markers
         int nOtherMarkers = 0; memcpy(&nOtherMarkers, ptr, 4); ptr += 4;
         printf("Unidentified Marker Count : %d\n", nOtherMarkers);
         for(int j=0; j < nOtherMarkers; j++)
@@ -658,13 +672,13 @@ void Unpack(char* pData)
             printf("\tMarker %d : pos = [%3.2f,%3.2f,%3.2f]\n",j,x,y,z);
         }
         
-        // rigid bodies
+        // Loop through rigidbodies
         int nRigidBodies = 0;
         memcpy(&nRigidBodies, ptr, 4); ptr += 4;
         printf("Rigid Body Count : %d\n", nRigidBodies);
         for (int j=0; j < nRigidBodies; j++)
         {
-            // rigid body pos/ori
+            // Rigid body position and orientation 
             int ID = 0; memcpy(&ID, ptr, 4); ptr += 4;
             float x = 0.0f; memcpy(&x, ptr, 4); ptr += 4;
             float y = 0.0f; memcpy(&y, ptr, 4); ptr += 4;
@@ -677,49 +691,7 @@ void Unpack(char* pData)
             printf("pos: [%3.2f,%3.2f,%3.2f]\n", x,y,z);
             printf("ori: [%3.2f,%3.2f,%3.2f,%3.2f]\n", qx,qy,qz,qw);
 
-            // associated marker positions
-            int nRigidMarkers = 0;  memcpy(&nRigidMarkers, ptr, 4); ptr += 4;
-            printf("Marker Count: %d\n", nRigidMarkers);
-            int nBytes = nRigidMarkers*3*sizeof(float);
-            float* markerData = (float*)malloc(nBytes);
-            memcpy(markerData, ptr, nBytes);
-            ptr += nBytes;
-            
-            if(major >= 2)
-            {
-                // associated marker IDs
-                nBytes = nRigidMarkers*sizeof(int);
-                int* markerIDs = (int*)malloc(nBytes);
-                memcpy(markerIDs, ptr, nBytes);
-                ptr += nBytes;
-
-                // associated marker sizes
-                nBytes = nRigidMarkers*sizeof(float);
-                float* markerSizes = (float*)malloc(nBytes);
-                memcpy(markerSizes, ptr, nBytes);
-                ptr += nBytes;
-
-                for(int k=0; k < nRigidMarkers; k++)
-                {
-                    printf("\tMarker %d: id=%d\tsize=%3.1f\tpos=[%3.2f,%3.2f,%3.2f]\n", k, markerIDs[k], markerSizes[k], markerData[k*3], markerData[k*3+1],markerData[k*3+2]);
-                }
-
-                if(markerIDs)
-                    free(markerIDs);
-                if(markerSizes)
-                    free(markerSizes);
-
-            }
-            else
-            {
-                for(int k=0; k < nRigidMarkers; k++)
-                {
-                    printf("\tMarker %d: pos = [%3.2f,%3.2f,%3.2f]\n", k, markerData[k*3], markerData[k*3+1],markerData[k*3+2]);
-                }
-            }
-            if(markerData)
-                free(markerData);
-
+            // NatNet version 2.0 and later
             if(major >= 2)
             {
                 // Mean marker error
@@ -727,35 +699,40 @@ void Unpack(char* pData)
                 printf("Mean marker error: %3.2f\n", fError);
             }
 
-            // 2.6 and later
+            // NatNet version 2.6 and later
             if( ((major == 2)&&(minor >= 6)) || (major > 2) || (major == 0) ) 
             {
                 // params
                 short params = 0; memcpy(&params, ptr, 2); ptr += 2;
                 bool bTrackingValid = params & 0x01; // 0x01 : rigid body was successfully tracked in this frame
             }
-            
-        } // next rigid body
+           
+        } // Go to next rigid body
 
 
-        // skeletons (version 2.1 and later)
+        // Skeletons (NatNet version 2.1 and later)
         if( ((major == 2)&&(minor>0)) || (major>2))
         {
             int nSkeletons = 0;
             memcpy(&nSkeletons, ptr, 4); ptr += 4;
             printf("Skeleton Count : %d\n", nSkeletons);
+
+            // Loop through skeletons
             for (int j=0; j < nSkeletons; j++)
             {
                 // skeleton id
                 int skeletonID = 0;
                 memcpy(&skeletonID, ptr, 4); ptr += 4;
-                // # of rigid bodies (bones) in skeleton
+
+                // Number of rigid bodies (bones) in skeleton
                 int nRigidBodies = 0;
                 memcpy(&nRigidBodies, ptr, 4); ptr += 4;
                 printf("Rigid Body Count : %d\n", nRigidBodies);
+
+                // Loop through rigid bodies (bones) in skeleton
                 for (int j=0; j < nRigidBodies; j++)
                 {
-                    // rigid body pos/ori
+                    // Rigid body position and orientation
                     int ID = 0; memcpy(&ID, ptr, 4); ptr += 4;
                     float x = 0.0f; memcpy(&x, ptr, 4); ptr += 4;
                     float y = 0.0f; memcpy(&y, ptr, 4); ptr += 4;
@@ -768,39 +745,14 @@ void Unpack(char* pData)
                     printf("pos: [%3.2f,%3.2f,%3.2f]\n", x,y,z);
                     printf("ori: [%3.2f,%3.2f,%3.2f,%3.2f]\n", qx,qy,qz,qw);
 
-                    // associated marker positions
-                    int nRigidMarkers = 0;  memcpy(&nRigidMarkers, ptr, 4); ptr += 4;
-                    printf("Marker Count: %d\n", nRigidMarkers);
-                    int nBytes = nRigidMarkers*3*sizeof(float);
-                    float* markerData = (float*)malloc(nBytes);
-                    memcpy(markerData, ptr, nBytes);
-                    ptr += nBytes;
-
-                    // associated marker IDs
-                    nBytes = nRigidMarkers*sizeof(int);
-                    int* markerIDs = (int*)malloc(nBytes);
-                    memcpy(markerIDs, ptr, nBytes);
-                    ptr += nBytes;
-
-                    // associated marker sizes
-                    nBytes = nRigidMarkers*sizeof(float);
-                    float* markerSizes = (float*)malloc(nBytes);
-                    memcpy(markerSizes, ptr, nBytes);
-                    ptr += nBytes;
-
-                    for(int k=0; k < nRigidMarkers; k++)
-                    {
-                        printf("\tMarker %d: id=%d\tsize=%3.1f\tpos=[%3.2f,%3.2f,%3.2f]\n", k, markerIDs[k], markerSizes[k], markerData[k*3], markerData[k*3+1],markerData[k*3+2]);
-                    }
-
-                    // Mean marker error (2.0 and later)
+                    // Mean marker error (NatNet version 2.0 and later)
                     if(major >= 2)
                     {
                         float fError = 0.0f; memcpy(&fError, ptr, 4); ptr += 4;
                         printf("Mean marker error: %3.2f\n", fError);
                     }
 
-                    // Tracking flags (2.6 and later)
+                    // Tracking flags (NatNet version 2.6 and later)
                     if( ((major == 2)&&(minor >= 6)) || (major > 2) || (major == 0) ) 
                     {
                         // params
@@ -808,25 +760,19 @@ void Unpack(char* pData)
                         bool bTrackingValid = params & 0x01; // 0x01 : rigid body was successfully tracked in this frame
                     }
 
-                    // release resources
-                    if(markerIDs)
-                        free(markerIDs);
-                    if(markerSizes)
-                        free(markerSizes);
-                    if(markerData)
-                        free(markerData);
-
                 } // next rigid body
 
             } // next skeleton
         }
         
-		// labeled markers (version 2.3 and later)
+		// labeled markers (NatNet version 2.3 and later)
 		if( ((major == 2)&&(minor>=3)) || (major>2))
 		{
 			int nLabeledMarkers = 0;
 			memcpy(&nLabeledMarkers, ptr, 4); ptr += 4;
 			printf("Labeled Marker Count : %d\n", nLabeledMarkers);
+
+            // Loop through labeled markers
 			for (int j=0; j < nLabeledMarkers; j++)
 			{
 				// id
@@ -840,23 +786,32 @@ void Unpack(char* pData)
 				// size
 				float size = 0.0f; memcpy(&size, ptr, 4); ptr += 4;
 
-                // 2.6 and later
+                // NatNet version 2.6 and later
                 if( ((major == 2)&&(minor >= 6)) || (major > 2) || (major == 0) ) 
                 {
                     // marker params
                     short params = 0; memcpy(&params, ptr, 2); ptr += 2;
-                    bool bOccluded = params & 0x01;     // marker was not visible (occluded) in this frame
-                    bool bPCSolved = params & 0x02;     // position provided by point cloud solve
-                    bool bModelSolved = params & 0x04;  // position provided by model solve
+                    bool bOccluded = (params & 0x01) != 0;     // marker was not visible (occluded) in this frame
+                    bool bPCSolved = (params & 0x02) != 0;     // position provided by point cloud solve
+                    bool bModelSolved = (params & 0x04) != 0;  // position provided by model solve
+                }
+
+                // NatNet version 3.0 and later
+                float residual = 0.0f;
+                if ((major >= 3) || (major == 0))
+                {
+                    // Marker residual
+                    memcpy(&residual, ptr, 4); ptr += 4;
                 }
 
 				printf("ID  : %d\n", ID);
 				printf("pos : [%3.2f,%3.2f,%3.2f]\n", x,y,z);
-				printf("size: [%3.2f]\n", size);
-			}
+                printf("size: [%3.2f]\n", size);
+                printf("err:  [%3.2f]\n", residual);
+            }
 		}
 
-        // Force Plate data (version 2.9 and later)
+        // Force Plate data (NatNet version 2.9 and later)
         if (((major == 2) && (minor >= 9)) || (major > 2))
         {
             int nForcePlates;
@@ -885,9 +840,41 @@ void Unpack(char* pData)
             }
         }
 
-		// latency
-        float latency = 0.0f; memcpy(&latency, ptr, 4);	ptr += 4;
-        printf("latency : %3.3f\n", latency);
+        // Device data (NatNet version 3.0 and later)
+        if (((major == 2) && (minor >= 11)) || (major > 2))
+        {
+            int nDevices;
+            memcpy(&nDevices, ptr, 4); ptr += 4;
+            for (int iDevice = 0; iDevice < nDevices; iDevice++)
+            {
+                // ID
+                int ID = 0; memcpy(&ID, ptr, 4); ptr += 4;
+                printf("Device : %d\n", ID);
+
+                // Channel Count
+                int nChannels = 0; memcpy(&nChannels, ptr, 4); ptr += 4;
+
+                // Channel Data
+                for (int i = 0; i < nChannels; i++)
+                {
+                    printf(" Channel %d : ", i);
+                    int nFrames = 0; memcpy(&nFrames, ptr, 4); ptr += 4;
+                    for (int j = 0; j < nFrames; j++)
+                    {
+                        float val = 0.0f;  memcpy(&val, ptr, 4); ptr += 4;
+                        printf("%3.2f   ", val);
+                    }
+                    printf("\n");
+                }
+            }
+        }
+		
+		// software latency (removed in version 3.0)
+        if ( major < 3 )
+        {
+            float softwareLatency = 0.0f; memcpy(&softwareLatency, ptr, 4);	ptr += 4;
+            printf("software latency : %3.3f\n", softwareLatency);
+        }
 
 		// timecode
 		unsigned int timecode = 0; 	memcpy(&timecode, ptr, 4);	ptr += 4;
@@ -897,7 +884,8 @@ void Unpack(char* pData)
 
         // timestamp
         double timestamp = 0.0f;
-        // 2.7 and later - increased from single to double precision
+
+        // NatNet version 2.7 and later - increased from single to double precision
         if( ((major == 2)&&(minor>=7)) || (major>2))
         {
             memcpy(&timestamp, ptr, 8); ptr += 8;
@@ -908,11 +896,28 @@ void Unpack(char* pData)
             memcpy(&fTemp, ptr, 4); ptr += 4;
             timestamp = (double)fTemp;
         }
+        printf("Timestamp : %3.3f\n", timestamp);
+
+        // high res timestamps (version 3.0 and later)
+        if ( (major >= 3) || (major == 0) )
+        {
+            uint64_t cameraMidExposureTimestamp = 0;
+            memcpy( &cameraMidExposureTimestamp, ptr, 8 ); ptr += 8;
+            printf( "Mid-exposure timestamp : %"PRIu64"\n", cameraMidExposureTimestamp );
+
+            uint64_t cameraDataReceivedTimestamp = 0;
+            memcpy( &cameraDataReceivedTimestamp, ptr, 8 ); ptr += 8;
+            printf( "Camera data received timestamp : %"PRIu64"\n", cameraDataReceivedTimestamp );
+
+            uint64_t transmitTimestamp = 0;
+            memcpy( &transmitTimestamp, ptr, 8 ); ptr += 8;
+            printf( "Transmit timestamp : %"PRIu64"\n", transmitTimestamp );
+        }
 
         // frame params
         short params = 0;  memcpy(&params, ptr, 2); ptr += 2;
-        bool bIsRecording = params & 0x01;                  // 0x01 Motive is recording
-        bool bTrackedModelsChanged = params & 0x02;         // 0x02 Actively tracked model list has changed
+        bool bIsRecording = (params & 0x01) != 0;                  // 0x01 Motive is recording
+        bool bTrackedModelsChanged = (params & 0x02) != 0;         // 0x02 Actively tracked model list has changed
 
 
 		// end of data tag
@@ -981,6 +986,40 @@ void Unpack(char* pData)
                 float zoffset = 0; memcpy(&zoffset, ptr, 4); ptr +=4;
                 printf("Z Offset : %3.2f\n", zoffset);
 
+                // Per-marker data (NatNet 3.0 and later)
+                if ( major >= 3 )
+                {
+                    int nMarkers = 0; memcpy( &nMarkers, ptr, 4 ); ptr += 4;
+
+                    // Marker positions
+                    nBytes = nMarkers * 3 * sizeof( float );
+                    float* markerPositions = (float*)malloc( nBytes );
+                    memcpy( markerPositions, ptr, nBytes );
+                    ptr += nBytes;
+
+                    // Marker required active labels
+                    nBytes = nMarkers * sizeof( int );
+                    int* markerRequiredLabels = (int*)malloc( nBytes );
+                    memcpy( markerRequiredLabels, ptr, nBytes );
+                    ptr += nBytes;
+
+                    for ( int markerIdx = 0; markerIdx < nMarkers; ++markerIdx )
+                    {
+                        float* markerPosition = markerPositions + markerIdx * 3;
+                        const int markerRequiredLabel = markerRequiredLabels[markerIdx];
+
+                        printf( "\tMarker #%d:\n", markerIdx );
+                        printf( "\t\tPosition: %.2f, %.2f, %.2f\n", markerPosition[0], markerPosition[1], markerPosition[2] );
+
+                        if ( markerRequiredLabel != 0 )
+                        {
+                            printf( "\t\tRequired active label: %d\n", markerRequiredLabel );
+                        }
+                    }
+
+                    free( markerPositions );
+                    free( markerRequiredLabels );
+                }
             }
             else if(type ==2)   // skeleton
             {

@@ -30,24 +30,22 @@ namespace WinFormTestApp
         {
             this.components = new System.ComponentModel.Container();
             System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle1 = new System.Windows.Forms.DataGridViewCellStyle();
+            System.Windows.Forms.DataVisualization.Charting.ChartArea chartArea1 = new System.Windows.Forms.DataVisualization.Charting.ChartArea();
+            System.Windows.Forms.DataVisualization.Charting.Legend legend1 = new System.Windows.Forms.DataVisualization.Charting.Legend();
+            System.Windows.Forms.DataVisualization.Charting.Series series1 = new System.Windows.Forms.DataVisualization.Charting.Series();
+            System.Windows.Forms.DataVisualization.Charting.Title title1 = new System.Windows.Forms.DataVisualization.Charting.Title();
             System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle2 = new System.Windows.Forms.DataGridViewCellStyle();
             System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle3 = new System.Windows.Forms.DataGridViewCellStyle();
             System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle4 = new System.Windows.Forms.DataGridViewCellStyle();
             System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle5 = new System.Windows.Forms.DataGridViewCellStyle();
             System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle6 = new System.Windows.Forms.DataGridViewCellStyle();
             System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle7 = new System.Windows.Forms.DataGridViewCellStyle();
-            System.Windows.Forms.DataVisualization.Charting.ChartArea chartArea1 = new System.Windows.Forms.DataVisualization.Charting.ChartArea();
-            System.Windows.Forms.DataVisualization.Charting.Legend legend1 = new System.Windows.Forms.DataVisualization.Charting.Legend();
-            System.Windows.Forms.DataVisualization.Charting.Series series1 = new System.Windows.Forms.DataVisualization.Charting.Series();
-            System.Windows.Forms.DataVisualization.Charting.Title title1 = new System.Windows.Forms.DataVisualization.Charting.Title();
+            System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle8 = new System.Windows.Forms.DataGridViewCellStyle();
+            System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle9 = new System.Windows.Forms.DataGridViewCellStyle();
+            System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle10 = new System.Windows.Forms.DataGridViewCellStyle();
+            System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle11 = new System.Windows.Forms.DataGridViewCellStyle();
+            System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle12 = new System.Windows.Forms.DataGridViewCellStyle();
             this.dataGridView1 = new System.Windows.Forms.DataGridView();
-            this.ID = new System.Windows.Forms.DataGridViewTextBoxColumn();
-            this.X = new System.Windows.Forms.DataGridViewTextBoxColumn();
-            this.Y = new System.Windows.Forms.DataGridViewTextBoxColumn();
-            this.Z = new System.Windows.Forms.DataGridViewTextBoxColumn();
-            this.Yaw = new System.Windows.Forms.DataGridViewTextBoxColumn();
-            this.Pitch = new System.Windows.Forms.DataGridViewTextBoxColumn();
-            this.Roll = new System.Windows.Forms.DataGridViewTextBoxColumn();
             this.listView1 = new System.Windows.Forms.ListView();
             this.columnHeader1 = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
             this.columnHeader2 = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
@@ -58,12 +56,10 @@ namespace WinFormTestApp
             this.buttonGetDataDescriptions = new System.Windows.Forms.Button();
             this.chart1 = new System.Windows.Forms.DataVisualization.Charting.Chart();
             this.label1 = new System.Windows.Forms.Label();
-            this.RecordButton = new System.Windows.Forms.Button();
-            this.TimelineStopButton = new System.Windows.Forms.Button();
-            this.LiveModeButton = new System.Windows.Forms.Button();
-            this.TimelinePlayButton = new System.Windows.Forms.Button();
             this.tabControl1 = new System.Windows.Forms.TabControl();
             this.tabPage1 = new System.Windows.Forms.TabPage();
+            this.LabeledMarkersCheckBox = new System.Windows.Forms.CheckBox();
+            this.PollCheckBox = new System.Windows.Forms.CheckBox();
             this.RecordDataButton = new System.Windows.Forms.CheckBox();
             this.DroppedFrameCountLabel = new System.Windows.Forms.Label();
             this.label6 = new System.Windows.Forms.Label();
@@ -88,14 +84,43 @@ namespace WinFormTestApp
             this.StopRecordButton = new System.Windows.Forms.Button();
             this.SetRecordingTakeButton = new System.Windows.Forms.Button();
             this.RecordingTakeNameText = new System.Windows.Forms.TextBox();
+            this.TimelineStopButton = new System.Windows.Forms.Button();
+            this.LiveModeButton = new System.Windows.Forms.Button();
+            this.RecordButton = new System.Windows.Forms.Button();
             this.EditModeButton = new System.Windows.Forms.Button();
-            this.PollCheckBox = new System.Windows.Forms.CheckBox();
+            this.TimelinePlayButton = new System.Windows.Forms.Button();
+            this.tabPage3 = new System.Windows.Forms.TabPage();
+            this.DisableAssetButton = new System.Windows.Forms.Button();
+            this.EnableAssetButton = new System.Windows.Forms.Button();
+            this.GetPropertyButton = new System.Windows.Forms.Button();
+            this.label8 = new System.Windows.Forms.Label();
+            this.label7 = new System.Windows.Forms.Label();
+            this.label5 = new System.Windows.Forms.Label();
+            this.NodeNameText = new System.Windows.Forms.TextBox();
+            this.PropertyNameText = new System.Windows.Forms.TextBox();
+            this.PropertyValueText = new System.Windows.Forms.TextBox();
+            this.SetPropertyButton = new System.Windows.Forms.Button();
+            this.panel1 = new System.Windows.Forms.Panel();
+            this.ID = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.X = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.Y = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.Z = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.Yaw = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.Pitch = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.Roll = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.InterframeTime = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.FrameDrop = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.SystemLatency = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.SoftwareLatency = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.TransitLatency = new System.Windows.Forms.DataGridViewTextBoxColumn();
             ((System.ComponentModel.ISupportInitialize)(this.dataGridView1)).BeginInit();
             this.contextMenuStrip1.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.chart1)).BeginInit();
             this.tabControl1.SuspendLayout();
             this.tabPage1.SuspendLayout();
             this.tabPage2.SuspendLayout();
+            this.tabPage3.SuspendLayout();
+            this.panel1.SuspendLayout();
             this.SuspendLayout();
             // 
             // dataGridView1
@@ -120,92 +145,22 @@ namespace WinFormTestApp
             this.Z,
             this.Yaw,
             this.Pitch,
-            this.Roll});
+            this.Roll,
+            this.InterframeTime,
+            this.FrameDrop,
+            this.SystemLatency,
+            this.SoftwareLatency,
+            this.TransitLatency});
             this.dataGridView1.EnableHeadersVisualStyles = false;
-            this.dataGridView1.Location = new System.Drawing.Point(12, 12);
+            this.dataGridView1.Location = new System.Drawing.Point(3, 0);
             this.dataGridView1.Name = "dataGridView1";
             this.dataGridView1.ReadOnly = true;
             this.dataGridView1.RowHeadersVisible = false;
             this.dataGridView1.RowTemplate.ReadOnly = true;
+            this.dataGridView1.ScrollBars = System.Windows.Forms.ScrollBars.None;
             this.dataGridView1.SelectionMode = System.Windows.Forms.DataGridViewSelectionMode.CellSelect;
-            this.dataGridView1.Size = new System.Drawing.Size(560, 429);
+            this.dataGridView1.Size = new System.Drawing.Size(854, 474);
             this.dataGridView1.TabIndex = 1;
-            // 
-            // ID
-            // 
-            this.ID.AutoSizeMode = System.Windows.Forms.DataGridViewAutoSizeColumnMode.None;
-            this.ID.FillWeight = 62.07922F;
-            this.ID.HeaderText = "ID";
-            this.ID.MinimumWidth = 50;
-            this.ID.Name = "ID";
-            this.ID.ReadOnly = true;
-            this.ID.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
-            // 
-            // X
-            // 
-            dataGridViewCellStyle2.Format = "N4";
-            dataGridViewCellStyle2.NullValue = null;
-            this.X.DefaultCellStyle = dataGridViewCellStyle2;
-            this.X.FillWeight = 22.52875F;
-            this.X.HeaderText = "X";
-            this.X.Name = "X";
-            this.X.ReadOnly = true;
-            this.X.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
-            // 
-            // Y
-            // 
-            dataGridViewCellStyle3.Format = "N2";
-            dataGridViewCellStyle3.NullValue = null;
-            this.Y.DefaultCellStyle = dataGridViewCellStyle3;
-            this.Y.FillWeight = 22.52875F;
-            this.Y.HeaderText = "Y";
-            this.Y.Name = "Y";
-            this.Y.ReadOnly = true;
-            this.Y.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
-            // 
-            // Z
-            // 
-            dataGridViewCellStyle4.Format = "N2";
-            dataGridViewCellStyle4.NullValue = null;
-            this.Z.DefaultCellStyle = dataGridViewCellStyle4;
-            this.Z.FillWeight = 22.52875F;
-            this.Z.HeaderText = "Z";
-            this.Z.Name = "Z";
-            this.Z.ReadOnly = true;
-            this.Z.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
-            // 
-            // Yaw
-            // 
-            dataGridViewCellStyle5.Format = "N2";
-            dataGridViewCellStyle5.NullValue = null;
-            this.Yaw.DefaultCellStyle = dataGridViewCellStyle5;
-            this.Yaw.FillWeight = 22.52875F;
-            this.Yaw.HeaderText = "Pitch (X)";
-            this.Yaw.Name = "Yaw";
-            this.Yaw.ReadOnly = true;
-            this.Yaw.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
-            // 
-            // Pitch
-            // 
-            dataGridViewCellStyle6.Format = "N2";
-            dataGridViewCellStyle6.NullValue = null;
-            this.Pitch.DefaultCellStyle = dataGridViewCellStyle6;
-            this.Pitch.FillWeight = 22.52875F;
-            this.Pitch.HeaderText = "Yaw (Y)";
-            this.Pitch.Name = "Pitch";
-            this.Pitch.ReadOnly = true;
-            this.Pitch.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
-            // 
-            // Roll
-            // 
-            dataGridViewCellStyle7.Format = "N2";
-            dataGridViewCellStyle7.NullValue = null;
-            this.Roll.DefaultCellStyle = dataGridViewCellStyle7;
-            this.Roll.FillWeight = 22.52875F;
-            this.Roll.HeaderText = "Roll (Z)";
-            this.Roll.Name = "Roll";
-            this.Roll.ReadOnly = true;
-            this.Roll.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
             // 
             // listView1
             // 
@@ -218,9 +173,9 @@ namespace WinFormTestApp
             this.listView1.ContextMenuStrip = this.contextMenuStrip1;
             this.listView1.GridLines = true;
             this.listView1.HeaderStyle = System.Windows.Forms.ColumnHeaderStyle.None;
-            this.listView1.Location = new System.Drawing.Point(578, 261);
+            this.listView1.Location = new System.Drawing.Point(898, 266);
             this.listView1.Name = "listView1";
-            this.listView1.Size = new System.Drawing.Size(363, 180);
+            this.listView1.Size = new System.Drawing.Size(382, 220);
             this.listView1.TabIndex = 3;
             this.listView1.UseCompatibleStateImageBehavior = false;
             this.listView1.View = System.Windows.Forms.View.Details;
@@ -277,7 +232,7 @@ namespace WinFormTestApp
             this.buttonGetDataDescriptions.Location = new System.Drawing.Point(110, 103);
             this.buttonGetDataDescriptions.Name = "buttonGetDataDescriptions";
             this.buttonGetDataDescriptions.Size = new System.Drawing.Size(122, 23);
-            this.buttonGetDataDescriptions.TabIndex = 11;
+            this.buttonGetDataDescriptions.TabIndex = 6;
             this.buttonGetDataDescriptions.Text = "Get Data Descriptions";
             this.buttonGetDataDescriptions.UseVisualStyleBackColor = true;
             this.buttonGetDataDescriptions.Click += new System.EventHandler(this.buttonGetDataDescriptions_Click);
@@ -314,7 +269,7 @@ namespace WinFormTestApp
             legend1.Position.X = 84.04308F;
             legend1.Position.Y = 4F;
             this.chart1.Legends.Add(legend1);
-            this.chart1.Location = new System.Drawing.Point(12, 447);
+            this.chart1.Location = new System.Drawing.Point(12, 492);
             this.chart1.Name = "chart1";
             series1.ChartArea = "ChartArea1";
             series1.ChartType = System.Windows.Forms.DataVisualization.Charting.SeriesChartType.FastLine;
@@ -327,7 +282,7 @@ namespace WinFormTestApp
             series1.MarkerStyle = System.Windows.Forms.DataVisualization.Charting.MarkerStyle.Circle;
             series1.Name = "Series1";
             this.chart1.Series.Add(series1);
-            this.chart1.Size = new System.Drawing.Size(929, 340);
+            this.chart1.Size = new System.Drawing.Size(1268, 415);
             this.chart1.TabIndex = 12;
             this.chart1.Text = "chart1";
             title1.Font = new System.Drawing.Font("Segoe UI", 14.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
@@ -344,51 +299,11 @@ namespace WinFormTestApp
             this.label1.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
             this.label1.Font = new System.Drawing.Font("Microsoft Sans Serif", 10F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.label1.ForeColor = System.Drawing.SystemColors.ControlText;
-            this.label1.Location = new System.Drawing.Point(578, 237);
+            this.label1.Location = new System.Drawing.Point(898, 246);
             this.label1.Name = "label1";
-            this.label1.Size = new System.Drawing.Size(363, 21);
+            this.label1.Size = new System.Drawing.Size(382, 21);
             this.label1.TabIndex = 13;
             this.label1.Text = "Messages";
-            // 
-            // RecordButton
-            // 
-            this.RecordButton.Location = new System.Drawing.Point(11, 69);
-            this.RecordButton.Name = "RecordButton";
-            this.RecordButton.Size = new System.Drawing.Size(99, 23);
-            this.RecordButton.TabIndex = 16;
-            this.RecordButton.Text = "Record";
-            this.RecordButton.UseVisualStyleBackColor = true;
-            this.RecordButton.Click += new System.EventHandler(this.RecordButton_Click);
-            // 
-            // TimelineStopButton
-            // 
-            this.TimelineStopButton.Location = new System.Drawing.Point(122, 131);
-            this.TimelineStopButton.Name = "TimelineStopButton";
-            this.TimelineStopButton.Size = new System.Drawing.Size(99, 23);
-            this.TimelineStopButton.TabIndex = 17;
-            this.TimelineStopButton.Text = "Timeline Stop";
-            this.TimelineStopButton.UseVisualStyleBackColor = true;
-            this.TimelineStopButton.Click += new System.EventHandler(this.TimelineStopButton_Click);
-            // 
-            // LiveModeButton
-            // 
-            this.LiveModeButton.Location = new System.Drawing.Point(11, 100);
-            this.LiveModeButton.Name = "LiveModeButton";
-            this.LiveModeButton.Size = new System.Drawing.Size(99, 23);
-            this.LiveModeButton.TabIndex = 18;
-            this.LiveModeButton.Text = "Live Mode";
-            this.LiveModeButton.UseVisualStyleBackColor = true;
-            this.LiveModeButton.Click += new System.EventHandler(this.LiveModeButton_Click);
-            // 
-            // TimelinePlayButton
-            // 
-            this.TimelinePlayButton.Location = new System.Drawing.Point(11, 131);
-            this.TimelinePlayButton.Name = "TimelinePlayButton";
-            this.TimelinePlayButton.Size = new System.Drawing.Size(99, 23);
-            this.TimelinePlayButton.TabIndex = 20;
-            this.TimelinePlayButton.Text = "Timeline Play";
-            this.TimelinePlayButton.UseVisualStyleBackColor = true;
-            this.TimelinePlayButton.Click += new System.EventHandler(this.TimelinePlayButton_Click);
             // 
             // tabControl1
             // 
@@ -396,14 +311,16 @@ namespace WinFormTestApp
             | System.Windows.Forms.AnchorStyles.Right)));
             this.tabControl1.Controls.Add(this.tabPage1);
             this.tabControl1.Controls.Add(this.tabPage2);
-            this.tabControl1.Location = new System.Drawing.Point(578, 12);
+            this.tabControl1.Controls.Add(this.tabPage3);
+            this.tabControl1.Location = new System.Drawing.Point(898, 12);
             this.tabControl1.Name = "tabControl1";
             this.tabControl1.SelectedIndex = 0;
-            this.tabControl1.Size = new System.Drawing.Size(363, 222);
+            this.tabControl1.Size = new System.Drawing.Size(382, 227);
             this.tabControl1.TabIndex = 21;
             // 
             // tabPage1
             // 
+            this.tabPage1.Controls.Add(this.LabeledMarkersCheckBox);
             this.tabPage1.Controls.Add(this.PollCheckBox);
             this.tabPage1.Controls.Add(this.RecordDataButton);
             this.tabPage1.Controls.Add(this.DroppedFrameCountLabel);
@@ -424,10 +341,31 @@ namespace WinFormTestApp
             this.tabPage1.Location = new System.Drawing.Point(4, 22);
             this.tabPage1.Name = "tabPage1";
             this.tabPage1.Padding = new System.Windows.Forms.Padding(3);
-            this.tabPage1.Size = new System.Drawing.Size(355, 196);
+            this.tabPage1.Size = new System.Drawing.Size(374, 201);
             this.tabPage1.TabIndex = 0;
             this.tabPage1.Text = "Connect";
             this.tabPage1.UseVisualStyleBackColor = true;
+            // 
+            // LabeledMarkersCheckBox
+            // 
+            this.LabeledMarkersCheckBox.AutoSize = true;
+            this.LabeledMarkersCheckBox.Location = new System.Drawing.Point(217, 40);
+            this.LabeledMarkersCheckBox.Name = "LabeledMarkersCheckBox";
+            this.LabeledMarkersCheckBox.Size = new System.Drawing.Size(105, 17);
+            this.LabeledMarkersCheckBox.TabIndex = 30;
+            this.LabeledMarkersCheckBox.Text = "Labeled Markers";
+            this.LabeledMarkersCheckBox.UseVisualStyleBackColor = true;
+            // 
+            // PollCheckBox
+            // 
+            this.PollCheckBox.AutoSize = true;
+            this.PollCheckBox.Location = new System.Drawing.Point(217, 17);
+            this.PollCheckBox.Name = "PollCheckBox";
+            this.PollCheckBox.Size = new System.Drawing.Size(43, 17);
+            this.PollCheckBox.TabIndex = 4;
+            this.PollCheckBox.Text = "Poll";
+            this.PollCheckBox.UseVisualStyleBackColor = true;
+            this.PollCheckBox.CheckedChanged += new System.EventHandler(this.PollCheckBox_CheckedChanged);
             // 
             // RecordDataButton
             // 
@@ -437,7 +375,7 @@ namespace WinFormTestApp
             this.RecordDataButton.Location = new System.Drawing.Point(247, 103);
             this.RecordDataButton.Name = "RecordDataButton";
             this.RecordDataButton.Size = new System.Drawing.Size(80, 23);
-            this.RecordDataButton.TabIndex = 24;
+            this.RecordDataButton.TabIndex = 7;
             this.RecordDataButton.Text = "Record";
             this.RecordDataButton.UseVisualStyleBackColor = true;
             this.RecordDataButton.CheckedChanged += new System.EventHandler(this.RecordDataButton_CheckedChanged);
@@ -445,7 +383,7 @@ namespace WinFormTestApp
             // DroppedFrameCountLabel
             // 
             this.DroppedFrameCountLabel.AutoSize = true;
-            this.DroppedFrameCountLabel.Location = new System.Drawing.Point(100, 166);
+            this.DroppedFrameCountLabel.Location = new System.Drawing.Point(272, 140);
             this.DroppedFrameCountLabel.Name = "DroppedFrameCountLabel";
             this.DroppedFrameCountLabel.Size = new System.Drawing.Size(43, 13);
             this.DroppedFrameCountLabel.TabIndex = 23;
@@ -454,7 +392,7 @@ namespace WinFormTestApp
             // label6
             // 
             this.label6.AutoSize = true;
-            this.label6.Location = new System.Drawing.Point(9, 166);
+            this.label6.Location = new System.Drawing.Point(177, 140);
             this.label6.Name = "label6";
             this.label6.Size = new System.Drawing.Size(94, 13);
             this.label6.TabIndex = 22;
@@ -463,7 +401,7 @@ namespace WinFormTestApp
             // TimecodeValue
             // 
             this.TimecodeValue.AutoSize = true;
-            this.TimecodeValue.Location = new System.Drawing.Point(255, 141);
+            this.TimecodeValue.Location = new System.Drawing.Point(89, 163);
             this.TimecodeValue.Name = "TimecodeValue";
             this.TimecodeValue.Size = new System.Drawing.Size(43, 13);
             this.TimecodeValue.TabIndex = 21;
@@ -472,7 +410,7 @@ namespace WinFormTestApp
             // TimestampValue
             // 
             this.TimestampValue.AutoSize = true;
-            this.TimestampValue.Location = new System.Drawing.Point(100, 141);
+            this.TimestampValue.Location = new System.Drawing.Point(89, 140);
             this.TimestampValue.Name = "TimestampValue";
             this.TimestampValue.Size = new System.Drawing.Size(43, 13);
             this.TimestampValue.TabIndex = 20;
@@ -481,7 +419,7 @@ namespace WinFormTestApp
             // label4
             // 
             this.label4.AutoSize = true;
-            this.label4.Location = new System.Drawing.Point(196, 141);
+            this.label4.Location = new System.Drawing.Point(11, 163);
             this.label4.Name = "label4";
             this.label4.Size = new System.Drawing.Size(60, 13);
             this.label4.TabIndex = 19;
@@ -490,7 +428,7 @@ namespace WinFormTestApp
             // TimestampLabel
             // 
             this.TimestampLabel.AutoSize = true;
-            this.TimestampLabel.Location = new System.Drawing.Point(9, 141);
+            this.TimestampLabel.Location = new System.Drawing.Point(11, 140);
             this.TimestampLabel.Name = "TimestampLabel";
             this.TimestampLabel.Size = new System.Drawing.Size(67, 13);
             this.TimestampLabel.TabIndex = 18;
@@ -502,7 +440,7 @@ namespace WinFormTestApp
             this.comboBoxLocal.Location = new System.Drawing.Point(58, 15);
             this.comboBoxLocal.Name = "comboBoxLocal";
             this.comboBoxLocal.Size = new System.Drawing.Size(121, 21);
-            this.comboBoxLocal.TabIndex = 17;
+            this.comboBoxLocal.TabIndex = 0;
             // 
             // label3
             // 
@@ -536,7 +474,7 @@ namespace WinFormTestApp
             this.textBoxServer.Location = new System.Drawing.Point(58, 45);
             this.textBoxServer.Name = "textBoxServer";
             this.textBoxServer.Size = new System.Drawing.Size(121, 20);
-            this.textBoxServer.TabIndex = 8;
+            this.textBoxServer.TabIndex = 1;
             this.textBoxServer.Text = "127.0.0.1";
             // 
             // RadioUnicast
@@ -545,7 +483,7 @@ namespace WinFormTestApp
             this.RadioUnicast.Location = new System.Drawing.Point(130, 73);
             this.RadioUnicast.Name = "RadioUnicast";
             this.RadioUnicast.Size = new System.Drawing.Size(61, 17);
-            this.RadioUnicast.TabIndex = 15;
+            this.RadioUnicast.TabIndex = 3;
             this.RadioUnicast.Text = "Unicast";
             this.RadioUnicast.UseVisualStyleBackColor = true;
             this.RadioUnicast.CheckedChanged += new System.EventHandler(this.RadioUnicast_CheckedChanged);
@@ -557,7 +495,7 @@ namespace WinFormTestApp
             this.RadioMulticast.Location = new System.Drawing.Point(58, 73);
             this.RadioMulticast.Name = "RadioMulticast";
             this.RadioMulticast.Size = new System.Drawing.Size(67, 17);
-            this.RadioMulticast.TabIndex = 14;
+            this.RadioMulticast.TabIndex = 2;
             this.RadioMulticast.TabStop = true;
             this.RadioMulticast.Text = "Multicast";
             this.RadioMulticast.UseVisualStyleBackColor = true;
@@ -582,47 +520,47 @@ namespace WinFormTestApp
             this.tabPage2.Location = new System.Drawing.Point(4, 22);
             this.tabPage2.Name = "tabPage2";
             this.tabPage2.Padding = new System.Windows.Forms.Padding(3);
-            this.tabPage2.Size = new System.Drawing.Size(355, 196);
+            this.tabPage2.Size = new System.Drawing.Size(374, 201);
             this.tabPage2.TabIndex = 1;
             this.tabPage2.Text = "Commands";
             this.tabPage2.UseVisualStyleBackColor = true;
             // 
             // GetModeButton
             // 
-            this.GetModeButton.Location = new System.Drawing.Point(228, 160);
+            this.GetModeButton.Location = new System.Drawing.Point(228, 165);
             this.GetModeButton.Name = "GetModeButton";
             this.GetModeButton.Size = new System.Drawing.Size(98, 23);
-            this.GetModeButton.TabIndex = 30;
+            this.GetModeButton.TabIndex = 13;
             this.GetModeButton.Text = "Capture Mode?";
             this.GetModeButton.UseVisualStyleBackColor = true;
             this.GetModeButton.Click += new System.EventHandler(this.GetModeButton_Click);
             // 
             // GetTakeRangeButton
             // 
-            this.GetTakeRangeButton.Location = new System.Drawing.Point(122, 160);
+            this.GetTakeRangeButton.Location = new System.Drawing.Point(122, 165);
             this.GetTakeRangeButton.Name = "GetTakeRangeButton";
             this.GetTakeRangeButton.Size = new System.Drawing.Size(99, 23);
-            this.GetTakeRangeButton.TabIndex = 29;
+            this.GetTakeRangeButton.TabIndex = 12;
             this.GetTakeRangeButton.Text = "Get Range";
             this.GetTakeRangeButton.UseVisualStyleBackColor = true;
             this.GetTakeRangeButton.Click += new System.EventHandler(this.GetTakeRangeButton_Click);
             // 
             // TestButton
             // 
-            this.TestButton.Location = new System.Drawing.Point(227, 131);
+            this.TestButton.Location = new System.Drawing.Point(227, 136);
             this.TestButton.Name = "TestButton";
             this.TestButton.Size = new System.Drawing.Size(99, 23);
-            this.TestButton.TabIndex = 28;
+            this.TestButton.TabIndex = 10;
             this.TestButton.Text = "Test";
             this.TestButton.UseVisualStyleBackColor = true;
             this.TestButton.Click += new System.EventHandler(this.TestButton_Click);
             // 
             // GetLastFrameOfDataButton
             // 
-            this.GetLastFrameOfDataButton.Location = new System.Drawing.Point(11, 160);
+            this.GetLastFrameOfDataButton.Location = new System.Drawing.Point(11, 165);
             this.GetLastFrameOfDataButton.Name = "GetLastFrameOfDataButton";
             this.GetLastFrameOfDataButton.Size = new System.Drawing.Size(99, 23);
-            this.GetLastFrameOfDataButton.TabIndex = 27;
+            this.GetLastFrameOfDataButton.TabIndex = 11;
             this.GetLastFrameOfDataButton.Text = "Get Frame";
             this.GetLastFrameOfDataButton.UseVisualStyleBackColor = true;
             this.GetLastFrameOfDataButton.Click += new System.EventHandler(this.GetLastFrameOfDataButton_Click);
@@ -631,25 +569,25 @@ namespace WinFormTestApp
             // 
             this.SetPlaybackTakeButton.Location = new System.Drawing.Point(11, 39);
             this.SetPlaybackTakeButton.Name = "SetPlaybackTakeButton";
-            this.SetPlaybackTakeButton.Size = new System.Drawing.Size(171, 23);
-            this.SetPlaybackTakeButton.TabIndex = 26;
+            this.SetPlaybackTakeButton.Size = new System.Drawing.Size(149, 23);
+            this.SetPlaybackTakeButton.TabIndex = 2;
             this.SetPlaybackTakeButton.Text = "Set Playback Take Name";
             this.SetPlaybackTakeButton.UseVisualStyleBackColor = true;
             this.SetPlaybackTakeButton.Click += new System.EventHandler(this.SetPlaybackTakeButton_Click);
             // 
             // PlaybackTakeNameText
             // 
-            this.PlaybackTakeNameText.Location = new System.Drawing.Point(188, 41);
+            this.PlaybackTakeNameText.Location = new System.Drawing.Point(166, 41);
             this.PlaybackTakeNameText.Name = "PlaybackTakeNameText";
-            this.PlaybackTakeNameText.Size = new System.Drawing.Size(161, 20);
-            this.PlaybackTakeNameText.TabIndex = 25;
+            this.PlaybackTakeNameText.Size = new System.Drawing.Size(183, 20);
+            this.PlaybackTakeNameText.TabIndex = 3;
             // 
             // StopRecordButton
             // 
-            this.StopRecordButton.Location = new System.Drawing.Point(122, 69);
+            this.StopRecordButton.Location = new System.Drawing.Point(122, 74);
             this.StopRecordButton.Name = "StopRecordButton";
             this.StopRecordButton.Size = new System.Drawing.Size(99, 23);
-            this.StopRecordButton.TabIndex = 24;
+            this.StopRecordButton.TabIndex = 5;
             this.StopRecordButton.Text = "Stop Record";
             this.StopRecordButton.UseVisualStyleBackColor = true;
             this.StopRecordButton.Click += new System.EventHandler(this.StopRecordButton_Click);
@@ -658,51 +596,314 @@ namespace WinFormTestApp
             // 
             this.SetRecordingTakeButton.Location = new System.Drawing.Point(11, 10);
             this.SetRecordingTakeButton.Name = "SetRecordingTakeButton";
-            this.SetRecordingTakeButton.Size = new System.Drawing.Size(171, 23);
-            this.SetRecordingTakeButton.TabIndex = 23;
+            this.SetRecordingTakeButton.Size = new System.Drawing.Size(149, 23);
+            this.SetRecordingTakeButton.TabIndex = 0;
             this.SetRecordingTakeButton.Text = "Set Recording Take Name";
             this.SetRecordingTakeButton.UseVisualStyleBackColor = true;
             this.SetRecordingTakeButton.Click += new System.EventHandler(this.SetRecordingTakeButton_Click);
             // 
             // RecordingTakeNameText
             // 
-            this.RecordingTakeNameText.Location = new System.Drawing.Point(188, 12);
+            this.RecordingTakeNameText.Location = new System.Drawing.Point(166, 12);
             this.RecordingTakeNameText.Name = "RecordingTakeNameText";
-            this.RecordingTakeNameText.Size = new System.Drawing.Size(161, 20);
-            this.RecordingTakeNameText.TabIndex = 22;
+            this.RecordingTakeNameText.Size = new System.Drawing.Size(183, 20);
+            this.RecordingTakeNameText.TabIndex = 1;
+            // 
+            // TimelineStopButton
+            // 
+            this.TimelineStopButton.Location = new System.Drawing.Point(122, 136);
+            this.TimelineStopButton.Name = "TimelineStopButton";
+            this.TimelineStopButton.Size = new System.Drawing.Size(99, 23);
+            this.TimelineStopButton.TabIndex = 9;
+            this.TimelineStopButton.Text = "Timeline Stop";
+            this.TimelineStopButton.UseVisualStyleBackColor = true;
+            this.TimelineStopButton.Click += new System.EventHandler(this.TimelineStopButton_Click);
+            // 
+            // LiveModeButton
+            // 
+            this.LiveModeButton.Location = new System.Drawing.Point(11, 105);
+            this.LiveModeButton.Name = "LiveModeButton";
+            this.LiveModeButton.Size = new System.Drawing.Size(99, 23);
+            this.LiveModeButton.TabIndex = 6;
+            this.LiveModeButton.Text = "Live Mode";
+            this.LiveModeButton.UseVisualStyleBackColor = true;
+            this.LiveModeButton.Click += new System.EventHandler(this.LiveModeButton_Click);
+            // 
+            // RecordButton
+            // 
+            this.RecordButton.Location = new System.Drawing.Point(11, 74);
+            this.RecordButton.Name = "RecordButton";
+            this.RecordButton.Size = new System.Drawing.Size(99, 23);
+            this.RecordButton.TabIndex = 4;
+            this.RecordButton.Text = "Record";
+            this.RecordButton.UseVisualStyleBackColor = true;
+            this.RecordButton.Click += new System.EventHandler(this.RecordButton_Click);
             // 
             // EditModeButton
             // 
-            this.EditModeButton.Location = new System.Drawing.Point(122, 100);
+            this.EditModeButton.Location = new System.Drawing.Point(122, 105);
             this.EditModeButton.Name = "EditModeButton";
             this.EditModeButton.Size = new System.Drawing.Size(99, 23);
-            this.EditModeButton.TabIndex = 19;
+            this.EditModeButton.TabIndex = 7;
             this.EditModeButton.Text = "Edit Mode";
             this.EditModeButton.UseVisualStyleBackColor = true;
             this.EditModeButton.Click += new System.EventHandler(this.EditModeButton_Click);
             // 
-            // PollCheckBox
+            // TimelinePlayButton
             // 
-            this.PollCheckBox.AutoSize = true;
-            this.PollCheckBox.Location = new System.Drawing.Point(247, 73);
-            this.PollCheckBox.Name = "PollCheckBox";
-            this.PollCheckBox.Size = new System.Drawing.Size(43, 17);
-            this.PollCheckBox.TabIndex = 25;
-            this.PollCheckBox.Text = "Poll";
-            this.PollCheckBox.UseVisualStyleBackColor = true;
-            this.PollCheckBox.CheckedChanged += new System.EventHandler(this.PollCheckBox_CheckedChanged);
+            this.TimelinePlayButton.Location = new System.Drawing.Point(11, 136);
+            this.TimelinePlayButton.Name = "TimelinePlayButton";
+            this.TimelinePlayButton.Size = new System.Drawing.Size(99, 23);
+            this.TimelinePlayButton.TabIndex = 8;
+            this.TimelinePlayButton.Text = "Timeline Play";
+            this.TimelinePlayButton.UseVisualStyleBackColor = true;
+            this.TimelinePlayButton.Click += new System.EventHandler(this.TimelinePlayButton_Click);
+            // 
+            // tabPage3
+            // 
+            this.tabPage3.Controls.Add(this.DisableAssetButton);
+            this.tabPage3.Controls.Add(this.EnableAssetButton);
+            this.tabPage3.Controls.Add(this.GetPropertyButton);
+            this.tabPage3.Controls.Add(this.label8);
+            this.tabPage3.Controls.Add(this.label7);
+            this.tabPage3.Controls.Add(this.label5);
+            this.tabPage3.Controls.Add(this.NodeNameText);
+            this.tabPage3.Controls.Add(this.PropertyNameText);
+            this.tabPage3.Controls.Add(this.PropertyValueText);
+            this.tabPage3.Controls.Add(this.SetPropertyButton);
+            this.tabPage3.Location = new System.Drawing.Point(4, 22);
+            this.tabPage3.Name = "tabPage3";
+            this.tabPage3.Size = new System.Drawing.Size(374, 201);
+            this.tabPage3.TabIndex = 2;
+            this.tabPage3.Text = "Properties";
+            this.tabPage3.UseVisualStyleBackColor = true;
+            // 
+            // DisableAssetButton
+            // 
+            this.DisableAssetButton.Location = new System.Drawing.Point(112, 129);
+            this.DisableAssetButton.Name = "DisableAssetButton";
+            this.DisableAssetButton.Size = new System.Drawing.Size(98, 23);
+            this.DisableAssetButton.TabIndex = 6;
+            this.DisableAssetButton.Text = "Disable Asset";
+            this.DisableAssetButton.UseVisualStyleBackColor = true;
+            this.DisableAssetButton.Click += new System.EventHandler(this.DisableAssetButton_Click);
+            // 
+            // EnableAssetButton
+            // 
+            this.EnableAssetButton.Location = new System.Drawing.Point(9, 129);
+            this.EnableAssetButton.Name = "EnableAssetButton";
+            this.EnableAssetButton.Size = new System.Drawing.Size(98, 23);
+            this.EnableAssetButton.TabIndex = 5;
+            this.EnableAssetButton.Text = "Enable Asset";
+            this.EnableAssetButton.UseVisualStyleBackColor = true;
+            this.EnableAssetButton.Click += new System.EventHandler(this.EnableAssetButton_Click);
+            // 
+            // GetPropertyButton
+            // 
+            this.GetPropertyButton.Location = new System.Drawing.Point(112, 100);
+            this.GetPropertyButton.Name = "GetPropertyButton";
+            this.GetPropertyButton.Size = new System.Drawing.Size(98, 23);
+            this.GetPropertyButton.TabIndex = 4;
+            this.GetPropertyButton.Text = "Get Property";
+            this.GetPropertyButton.UseVisualStyleBackColor = true;
+            this.GetPropertyButton.Click += new System.EventHandler(this.GetPropertyButton_Click);
+            // 
+            // label8
+            // 
+            this.label8.AutoSize = true;
+            this.label8.Location = new System.Drawing.Point(6, 38);
+            this.label8.Name = "label8";
+            this.label8.Size = new System.Drawing.Size(46, 13);
+            this.label8.TabIndex = 40;
+            this.label8.Text = "Property";
+            // 
+            // label7
+            // 
+            this.label7.AutoSize = true;
+            this.label7.Location = new System.Drawing.Point(6, 64);
+            this.label7.Name = "label7";
+            this.label7.Size = new System.Drawing.Size(34, 13);
+            this.label7.TabIndex = 39;
+            this.label7.Text = "Value";
+            // 
+            // label5
+            // 
+            this.label5.AutoSize = true;
+            this.label5.Location = new System.Drawing.Point(6, 13);
+            this.label5.Name = "label5";
+            this.label5.Size = new System.Drawing.Size(33, 13);
+            this.label5.TabIndex = 38;
+            this.label5.Text = "Asset";
+            // 
+            // NodeNameText
+            // 
+            this.NodeNameText.Location = new System.Drawing.Point(74, 9);
+            this.NodeNameText.Name = "NodeNameText";
+            this.NodeNameText.Size = new System.Drawing.Size(136, 20);
+            this.NodeNameText.TabIndex = 0;
+            // 
+            // PropertyNameText
+            // 
+            this.PropertyNameText.Location = new System.Drawing.Point(74, 35);
+            this.PropertyNameText.Name = "PropertyNameText";
+            this.PropertyNameText.Size = new System.Drawing.Size(136, 20);
+            this.PropertyNameText.TabIndex = 1;
+            // 
+            // PropertyValueText
+            // 
+            this.PropertyValueText.Location = new System.Drawing.Point(74, 61);
+            this.PropertyValueText.Name = "PropertyValueText";
+            this.PropertyValueText.Size = new System.Drawing.Size(136, 20);
+            this.PropertyValueText.TabIndex = 2;
+            // 
+            // SetPropertyButton
+            // 
+            this.SetPropertyButton.Location = new System.Drawing.Point(9, 100);
+            this.SetPropertyButton.Name = "SetPropertyButton";
+            this.SetPropertyButton.Size = new System.Drawing.Size(98, 23);
+            this.SetPropertyButton.TabIndex = 3;
+            this.SetPropertyButton.Text = "Set Property";
+            this.SetPropertyButton.UseVisualStyleBackColor = true;
+            this.SetPropertyButton.Click += new System.EventHandler(this.SetPropertyButton_Click);
+            // 
+            // panel1
+            // 
+            this.panel1.AutoScroll = true;
+            this.panel1.Controls.Add(this.dataGridView1);
+            this.panel1.Location = new System.Drawing.Point(12, 12);
+            this.panel1.Name = "panel1";
+            this.panel1.Size = new System.Drawing.Size(880, 474);
+            this.panel1.TabIndex = 22;
+            // 
+            // ID
+            // 
+            this.ID.AutoSizeMode = System.Windows.Forms.DataGridViewAutoSizeColumnMode.None;
+            this.ID.FillWeight = 1000F;
+            this.ID.HeaderText = "ID";
+            this.ID.MinimumWidth = 100;
+            this.ID.Name = "ID";
+            this.ID.ReadOnly = true;
+            this.ID.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
+            this.ID.Width = 150;
+            // 
+            // X
+            // 
+            dataGridViewCellStyle2.Format = "N2";
+            dataGridViewCellStyle2.NullValue = null;
+            this.X.DefaultCellStyle = dataGridViewCellStyle2;
+            this.X.HeaderText = "X";
+            this.X.Name = "X";
+            this.X.ReadOnly = true;
+            this.X.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
+            // 
+            // Y
+            // 
+            dataGridViewCellStyle3.Format = "N2";
+            dataGridViewCellStyle3.NullValue = null;
+            this.Y.DefaultCellStyle = dataGridViewCellStyle3;
+            this.Y.HeaderText = "Y";
+            this.Y.Name = "Y";
+            this.Y.ReadOnly = true;
+            this.Y.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
+            // 
+            // Z
+            // 
+            dataGridViewCellStyle4.Format = "N2";
+            dataGridViewCellStyle4.NullValue = null;
+            this.Z.DefaultCellStyle = dataGridViewCellStyle4;
+            this.Z.HeaderText = "Z";
+            this.Z.Name = "Z";
+            this.Z.ReadOnly = true;
+            this.Z.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
+            // 
+            // Yaw
+            // 
+            dataGridViewCellStyle5.Format = "N2";
+            dataGridViewCellStyle5.NullValue = null;
+            this.Yaw.DefaultCellStyle = dataGridViewCellStyle5;
+            this.Yaw.HeaderText = "Pitch (X)";
+            this.Yaw.Name = "Yaw";
+            this.Yaw.ReadOnly = true;
+            this.Yaw.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
+            // 
+            // Pitch
+            // 
+            dataGridViewCellStyle6.Format = "N2";
+            dataGridViewCellStyle6.NullValue = null;
+            this.Pitch.DefaultCellStyle = dataGridViewCellStyle6;
+            this.Pitch.HeaderText = "Yaw (Y)";
+            this.Pitch.Name = "Pitch";
+            this.Pitch.ReadOnly = true;
+            this.Pitch.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
+            // 
+            // Roll
+            // 
+            dataGridViewCellStyle7.Format = "N2";
+            dataGridViewCellStyle7.NullValue = null;
+            this.Roll.DefaultCellStyle = dataGridViewCellStyle7;
+            this.Roll.HeaderText = "Roll (Z)";
+            this.Roll.Name = "Roll";
+            this.Roll.ReadOnly = true;
+            this.Roll.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
+            // 
+            // InterframeTime
+            // 
+            dataGridViewCellStyle8.Format = "N2";
+            dataGridViewCellStyle8.NullValue = null;
+            this.InterframeTime.DefaultCellStyle = dataGridViewCellStyle8;
+            this.InterframeTime.HeaderText = "Interframe Time";
+            this.InterframeTime.Name = "InterframeTime";
+            this.InterframeTime.ReadOnly = true;
+            this.InterframeTime.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
+            // 
+            // FrameDrop
+            // 
+            dataGridViewCellStyle9.Format = "N2";
+            dataGridViewCellStyle9.NullValue = null;
+            this.FrameDrop.DefaultCellStyle = dataGridViewCellStyle9;
+            this.FrameDrop.HeaderText = "Frame Drops";
+            this.FrameDrop.Name = "FrameDrop";
+            this.FrameDrop.ReadOnly = true;
+            this.FrameDrop.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
+            // 
+            // SystemLatency
+            // 
+            dataGridViewCellStyle10.Format = "N2";
+            this.SystemLatency.DefaultCellStyle = dataGridViewCellStyle10;
+            this.SystemLatency.HeaderText = "System Latency";
+            this.SystemLatency.Name = "SystemLatency";
+            this.SystemLatency.ReadOnly = true;
+            this.SystemLatency.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
+            // 
+            // SoftwareLatency
+            // 
+            dataGridViewCellStyle11.Format = "N2";
+            this.SoftwareLatency.DefaultCellStyle = dataGridViewCellStyle11;
+            this.SoftwareLatency.HeaderText = "Software Latency";
+            this.SoftwareLatency.Name = "SoftwareLatency";
+            this.SoftwareLatency.ReadOnly = true;
+            this.SoftwareLatency.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
+            // 
+            // TransitLatency
+            // 
+            dataGridViewCellStyle12.Format = "N2";
+            this.TransitLatency.DefaultCellStyle = dataGridViewCellStyle12;
+            this.TransitLatency.HeaderText = "Transit Latency";
+            this.TransitLatency.Name = "TransitLatency";
+            this.TransitLatency.ReadOnly = true;
+            this.TransitLatency.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
             // 
             // Form1
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.BackColor = System.Drawing.Color.Gainsboro;
-            this.ClientSize = new System.Drawing.Size(953, 799);
+            this.ClientSize = new System.Drawing.Size(1292, 919);
             this.Controls.Add(this.tabControl1);
             this.Controls.Add(this.label1);
             this.Controls.Add(this.chart1);
             this.Controls.Add(this.listView1);
-            this.Controls.Add(this.dataGridView1);
+            this.Controls.Add(this.panel1);
             this.Name = "Form1";
             this.Text = "NatNet Managed Client Sample";
             this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.Form1_FormClosing);
@@ -715,6 +916,9 @@ namespace WinFormTestApp
             this.tabPage1.PerformLayout();
             this.tabPage2.ResumeLayout(false);
             this.tabPage2.PerformLayout();
+            this.tabPage3.ResumeLayout(false);
+            this.tabPage3.PerformLayout();
+            this.panel1.ResumeLayout(false);
             this.ResumeLayout(false);
 
         }
@@ -729,10 +933,6 @@ namespace WinFormTestApp
         private System.Windows.Forms.Button buttonGetDataDescriptions;
         private System.Windows.Forms.DataVisualization.Charting.Chart chart1;
         private System.Windows.Forms.Label label1;
-        private System.Windows.Forms.Button RecordButton;
-        private System.Windows.Forms.Button TimelineStopButton;
-        private System.Windows.Forms.Button LiveModeButton;
-        private System.Windows.Forms.Button TimelinePlayButton;
         private System.Windows.Forms.TabControl tabControl1;
         private System.Windows.Forms.TabPage tabPage1;
         private System.Windows.Forms.Label Local;
@@ -740,19 +940,47 @@ namespace WinFormTestApp
         private System.Windows.Forms.TextBox textBoxServer;
         private System.Windows.Forms.RadioButton RadioUnicast;
         private System.Windows.Forms.RadioButton RadioMulticast;
-        private System.Windows.Forms.TabPage tabPage2;
-        private System.Windows.Forms.Button SetRecordingTakeButton;
-        private System.Windows.Forms.TextBox RecordingTakeNameText;
-        private System.Windows.Forms.Button EditModeButton;
         private System.Windows.Forms.Label label3;
-        private System.Windows.Forms.Button StopRecordButton;
         private System.Windows.Forms.ComboBox comboBoxLocal;
-        private System.Windows.Forms.Button SetPlaybackTakeButton;
-        private System.Windows.Forms.TextBox PlaybackTakeNameText;
         private System.Windows.Forms.Label TimestampLabel;
         private System.Windows.Forms.Label TimecodeValue;
         private System.Windows.Forms.Label TimestampValue;
         private System.Windows.Forms.Label label4;
+        private System.Windows.Forms.ContextMenuStrip contextMenuStrip1;
+        private System.Windows.Forms.ToolStripMenuItem menuClear;
+        private System.Windows.Forms.ToolStripMenuItem menuPause;
+        private System.Windows.Forms.Label DroppedFrameCountLabel;
+        private System.Windows.Forms.Label label6;
+        private System.Windows.Forms.CheckBox RecordDataButton;
+        private System.Windows.Forms.CheckBox PollCheckBox;
+        private System.Windows.Forms.TabPage tabPage2;
+        private System.Windows.Forms.Button GetModeButton;
+        private System.Windows.Forms.Button GetTakeRangeButton;
+        private System.Windows.Forms.Button TestButton;
+        private System.Windows.Forms.Button GetLastFrameOfDataButton;
+        private System.Windows.Forms.Button SetPlaybackTakeButton;
+        private System.Windows.Forms.TextBox PlaybackTakeNameText;
+        private System.Windows.Forms.Button StopRecordButton;
+        private System.Windows.Forms.Button SetRecordingTakeButton;
+        private System.Windows.Forms.TextBox RecordingTakeNameText;
+        private System.Windows.Forms.Button TimelineStopButton;
+        private System.Windows.Forms.Button LiveModeButton;
+        private System.Windows.Forms.Button RecordButton;
+        private System.Windows.Forms.Button EditModeButton;
+        private System.Windows.Forms.Button TimelinePlayButton;
+        private System.Windows.Forms.TabPage tabPage3;
+        private System.Windows.Forms.Button DisableAssetButton;
+        private System.Windows.Forms.Button EnableAssetButton;
+        private System.Windows.Forms.Button GetPropertyButton;
+        private System.Windows.Forms.Label label8;
+        private System.Windows.Forms.Label label7;
+        private System.Windows.Forms.Label label5;
+        private System.Windows.Forms.TextBox NodeNameText;
+        private System.Windows.Forms.TextBox PropertyNameText;
+        private System.Windows.Forms.TextBox PropertyValueText;
+        private System.Windows.Forms.Button SetPropertyButton;
+        private System.Windows.Forms.CheckBox LabeledMarkersCheckBox;
+        private System.Windows.Forms.Panel panel1;
         private System.Windows.Forms.DataGridViewTextBoxColumn ID;
         private System.Windows.Forms.DataGridViewTextBoxColumn X;
         private System.Windows.Forms.DataGridViewTextBoxColumn Y;
@@ -760,17 +988,11 @@ namespace WinFormTestApp
         private System.Windows.Forms.DataGridViewTextBoxColumn Yaw;
         private System.Windows.Forms.DataGridViewTextBoxColumn Pitch;
         private System.Windows.Forms.DataGridViewTextBoxColumn Roll;
-        private System.Windows.Forms.Button GetLastFrameOfDataButton;
-        private System.Windows.Forms.Button TestButton;
-        private System.Windows.Forms.ContextMenuStrip contextMenuStrip1;
-        private System.Windows.Forms.ToolStripMenuItem menuClear;
-        private System.Windows.Forms.ToolStripMenuItem menuPause;
-        private System.Windows.Forms.Label DroppedFrameCountLabel;
-        private System.Windows.Forms.Label label6;
-        private System.Windows.Forms.CheckBox RecordDataButton;
-        private System.Windows.Forms.Button GetModeButton;
-        private System.Windows.Forms.Button GetTakeRangeButton;
-        private System.Windows.Forms.CheckBox PollCheckBox;
+        private System.Windows.Forms.DataGridViewTextBoxColumn InterframeTime;
+        private System.Windows.Forms.DataGridViewTextBoxColumn FrameDrop;
+        private System.Windows.Forms.DataGridViewTextBoxColumn SystemLatency;
+        private System.Windows.Forms.DataGridViewTextBoxColumn SoftwareLatency;
+        private System.Windows.Forms.DataGridViewTextBoxColumn TransitLatency;
     }
 }
 

@@ -30,14 +30,14 @@ namespace
 
 //== CLASS DEFINITION =========================================================----
 
-class DLLCLASS cSlipStream
+class NATNET_API cSlipStream
 {
 public:
-    cSlipStream(const char *Address, int Port);
+    cSlipStream( const char *Address, int Port );
     ~cSlipStream();
 
     ///<summary>Output a block of data over UDP.</summary>
-    bool Stream(unsigned char* Buffer, int BufferSize);
+    bool Stream( unsigned char* Buffer, int BufferSize );
 
 private:
     char   mAddress[kMaxAddressLength];
@@ -45,5 +45,5 @@ private:
 
     SOCKET mSocket;
 
-    bool   StreamPacket(unsigned char *Buffer, int BufferSize);
+    bool   StreamPacket( unsigned char *Buffer, int BufferSize );
 };
