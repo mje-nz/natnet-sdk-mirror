@@ -34,12 +34,12 @@ Usage [optional]:
 #include <winsock2.h>
 #include <string>
 #include <sstream>
+#include <vector>
 #include <map>
 
 #include "NatNetTypes.h"
 #include "NatNetClient.h"
 
-#include "tinyxml/tinyxml.h"  //== for xml encoding of Unity3D payload
 #include "NatNetRepeater.h"   //== for transport of data over UDP to Unity3D
 
 //== Slip Stream globals ==--
@@ -64,137 +64,173 @@ char szMyIPAddress[128] = "";
 char szServerIPAddress[128] = "";
 char szUnityIPAddress[128] = "";
 
-void SendXMLToUnity(sFrameOfMocapData *data, void* pUserData);
+//== Helpers for text indicator of data flowing... ==--
+
+enum eStatusIndicator
+{
+    Uninitialized = 0,
+    Listening,
+    Streaming
+};
+
+eStatusIndicator gIndicator;
+
+double gIndicatorTimer = 0;
+double gFrequency = 0;
+
+long long getTickCount()
+{
+    long long   curTime;
+    QueryPerformanceCounter( reinterpret_cast<LARGE_INTEGER*>( &curTime ) );
+    return curTime;
+}
+
+void getFrequency()
+{
+    if( gFrequency==0 )
+    {
+        LARGE_INTEGER freq;
+        QueryPerformanceFrequency( &freq );
+        gFrequency = double( freq.QuadPart );
+
+        gIndicatorTimer = (double) getTickCount();
+    }
+}
+
+double elapsedTimer()
+{
+    getFrequency();
+    long long   curTime = getTickCount();
+    return (double) ( curTime - gIndicatorTimer ) / gFrequency;
+}
+
+void catchUp()
+{
+    gIndicatorTimer = (double) getTickCount();
+}
+
+
+void SendDescriptionsToUnity( sDataDescriptions * dataDescriptions );
 
 int _tmain(int argc, _TCHAR* argv[])
 {
     int iResult;
     int iConnectionType = ConnectionType_Multicast;
-    //int iConnectionType = ConnectionType_Unicast;
     
+    printf("[UnityClient] Motive->Unity3D Relaying Sample Application\n");
     // parse command line args
     if(argc>1)
     {
         strcpy(szServerIPAddress, argv[1]);	// specified on command line
-        printf("Connecting to server at %s...\n", szServerIPAddress);
+        printf("[UnityClient] Connecting to server at %s\n", szServerIPAddress);
     }
     else
     {
         strcpy(szServerIPAddress, "");		// not specified - assume server is local machine
-        printf("Connecting to server at LocalMachine\n");
-    }
-    if(argc>2)
-    {
-        strcpy(szMyIPAddress, argv[2]);	    // specified on command line
-        printf("Connecting from %s...\n", szMyIPAddress);
-    }
-    else
-    {
-        strcpy(szMyIPAddress, "");          // not specified - assume server is local machine
-        printf("Connecting from LocalMachine...\n");
+        printf("[UnityClient] Connecting to server at LocalMachine\n");
     }
     if(argc>3)
     {
         strcpy(szUnityIPAddress, argv[3]);	    // specified on command line
-        printf("Connecting to Unity3D at %s...\n", szUnityIPAddress);
+        printf("[UnityClient] Connecting to Unity3D at %s\n", szUnityIPAddress);
     }
     else
     {
         strcpy(szUnityIPAddress, "127.0.0.1");          // not specified - assume server is local machine
-        printf("Connecting to Unity3D on LocalMachine...\n");
+        printf("[UnityClient] Connecting to Unity3D on LocalMachine\n");
+    }
+    if( argc>2 )
+    {
+        strcpy( szMyIPAddress, argv[ 2 ] );	    // specified on command line
+        printf( "[UnityClient] Connecting from %s\n", szMyIPAddress );
+    }
+    else
+    {
+        strcpy( szMyIPAddress, "" );          // not specified - assume server is local machine
+        printf( "[UnityClient] Connecting from LocalMachine\n" );
     }
 
+    // Create SlipStream
     gSlipStream = new cSlipStream(szUnityIPAddress,16000);
 
     // Create NatNet Client
     iResult = CreateClient(iConnectionType);
+
     if(iResult != ErrorCode_OK)
     {
         printf("Error initializing client.  See log for details.  Exiting");
         return 1;
     }
-    else
-    {
-        printf("Client initialized and ready.\n");
-    }
-
-
-	// send/receive test request
-	printf("[SampleClient] Sending Test Request\n");
-	void* response;
-	int nBytes;
-	iResult = theClient->SendMessageAndWait("TestRequest", &response, &nBytes);
-	if (iResult == ErrorCode_OK)
-	{
-		printf("[SampleClient] Received: %s", (char*)response);
-	}
-
+    
 	// Retrieve Data Descriptions from server
-	printf("\n\n[SampleClient] Requesting Data Descriptions...");
+	printf("[UnityClient] Requesting assets from Motive\n");
 	sDataDescriptions* pDataDefs = NULL;
 	int nBodies = theClient->GetDataDescriptions(&pDataDefs);
 	if(!pDataDefs)
 	{
-		printf("[SampleClient] Unable to retrieve Data Descriptions.");
+		printf("[UnityClient] Unable to retrieve avatars\n");
 	}
 	else
 	{
-        printf("[SampleClient] Received %d Data Descriptions:\n", pDataDefs->nDataDescriptions );
+        int skeletonCount = 0;
+        int rigidBodyCount = 0;
+
         for(int i=0; i < pDataDefs->nDataDescriptions; i++)
         {
-            printf("Data Description # %d (type=%d)\n", i, pDataDefs->arrDataDescriptions[i].type);
-            if(pDataDefs->arrDataDescriptions[i].type == Descriptor_MarkerSet)
-            {
-                // MarkerSet
-                sMarkerSetDescription* pMS = pDataDefs->arrDataDescriptions[i].Data.MarkerSetDescription;
-                printf("MarkerSet Name : %s\n", pMS->szName);
-                for(int i=0; i < pMS->nMarkers; i++)
-                    printf("%s\n", pMS->szMarkerNames[i]);
-
-            }
-            else if(pDataDefs->arrDataDescriptions[i].type == Descriptor_RigidBody)
-            {
-                // RigidBody
-                sRigidBodyDescription* pRB = pDataDefs->arrDataDescriptions[i].Data.RigidBodyDescription;
-                printf("RigidBody Name : %s\n", pRB->szName);
-                printf("RigidBody ID : %d\n", pRB->ID);
-                printf("RigidBody Parent ID : %d\n", pRB->parentID);
-                printf("Parent Offset : %3.2f,%3.2f,%3.2f\n", pRB->offsetx, pRB->offsety, pRB->offsetz);
-            }
-            else if(pDataDefs->arrDataDescriptions[i].type == Descriptor_Skeleton)
+            if(pDataDefs->arrDataDescriptions[i].type == Descriptor_Skeleton)
             {
                 // Skeleton
+                skeletonCount++;
                 sSkeletonDescription* pSK = pDataDefs->arrDataDescriptions[i].Data.SkeletonDescription;
-                printf("Skeleton Name : %s\n", pSK->szName);
-                printf("Skeleton ID : %d\n", pSK->skeletonID);
-                printf("RigidBody (Bone) Count : %d\n", pSK->nRigidBodies);
+                printf("[UnityClient] Received skeleton description: %s\n", pSK->szName);
                 for(int j=0; j < pSK->nRigidBodies; j++)
                 {
                     sRigidBodyDescription* pRB = &pSK->RigidBodies[j];
-                    printf("  RigidBody Name : %s\n", pRB->szName);
-                    printf("  RigidBody ID : %d\n", pRB->ID);
-                    printf("  RigidBody Parent ID : %d\n", pRB->parentID);
-                    printf("  Parent Offset : %3.2f,%3.2f,%3.2f\n", pRB->offsetx, pRB->offsety, pRB->offsetz);
-
                     // populate bone name dictionary for use in xml ==--
-                    gBoneNames[pRB->ID] = pRB->szName;
+                    gBoneNames[pRB->ID+pSK->skeletonID*100] = pRB->szName;
                 }
             }
-            else
+            if( pDataDefs->arrDataDescriptions[ i ].type == Descriptor_RigidBody )
             {
-                printf("Unknown data type.");
-                // Unknown
+                rigidBodyCount++;
+                sRigidBodyDescription* pRB = pDataDefs->arrDataDescriptions[ i ].Data.RigidBodyDescription;
+                printf( "[UnityClient] Received rigid body description: %s\n", pRB->szName );
+
             }
-        }      
+        } 
+
+        //printf( "[UnityClient] Received %d Skeleton Description(s)\n", skeletonCount );
+        //printf( "[UnityClient] Received %d Rigid Body Description(s)\n", rigidBodyCount );
+
+        SendDescriptionsToUnity( pDataDefs );
 	}
 
 	// Ready to receive marker stream!
-	printf("\nClient is connected to server and listening for data...\n");
+	printf("[UnityClient] Connected to server and ready to relay data to Unity3D\n");
+    printf("[UnityClient] Listening for first frame of data...\n");
+    gIndicator = Listening;
+
 	int c;
 	bool bExit = false;
-	while(c =_getch())
+	while(!bExit)
 	{
-		switch(c)
+        while( !kbhit() )
+        {
+            Sleep( 10 );
+        
+            if( gIndicator==Streaming )
+            {
+                if( elapsedTimer()>1.0 )
+                {
+                    printf("[UnityClient] Data stream stalled.  Listening for more frame data...\n");
+                    gIndicator = Listening;
+                }
+            }
+        }
+		
+        c =_getch();
+
+        switch(c)
 		{
 			case 'q':
 				bExit = true;		
@@ -260,17 +296,17 @@ int CreateClient(int iConnectionType)
     // create NatNet client
     theClient = new NatNetClient(iConnectionType);
 
+    theClient->SetVerbosityLevel( Verbosity_None );
+
     // [optional] use old multicast group
     //theClient->SetMulticastAddress("224.0.0.1");
 
     // print version info
     unsigned char ver[4];
     theClient->NatNetVersion(ver);
-    printf("NatNet Sample Client (NatNet ver. %d.%d.%d.%d)\n", ver[0], ver[1], ver[2], ver[3]);
-
+   
     // Set callback handlers
     theClient->SetMessageCallback(MessageHandler);
-    theClient->SetVerbosityLevel(Verbosity_Debug);
     theClient->SetDataCallback( DataHandler, theClient );	// this function will receive data from the server
 
     // Init Client and connect to NatNet server
@@ -294,112 +330,202 @@ int CreateClient(int iConnectionType)
             printf("Unable to connect to server. Host not present. Exiting.");
             return 1;
         }
-        printf("[SampleClient] Server application info:\n");
-        printf("Application: %s (ver. %d.%d.%d.%d)\n", ServerDescription.szHostApp, ServerDescription.HostAppVersion[0],
-            ServerDescription.HostAppVersion[1],ServerDescription.HostAppVersion[2],ServerDescription.HostAppVersion[3]);
-        printf("NatNet Version: %d.%d.%d.%d\n", ServerDescription.NatNetVersion[0], ServerDescription.NatNetVersion[1],
-            ServerDescription.NatNetVersion[2], ServerDescription.NatNetVersion[3]);
-        printf("Client IP:%s\n", szMyIPAddress);
-        printf("Server IP:%s\n", szServerIPAddress);
-        printf("Server Name:%s\n\n", ServerDescription.szHostComputerName);
+        printf( "[UnityClient] Server    : %s\n", ServerDescription.szHostComputerName );
+        printf( "[UnityClient] Server  IP: %s\n", szServerIPAddress );
+        printf( "[UnityClient] Unity3D IP: %s\n", szUnityIPAddress );
+        printf( "[UnityClient] Current IP: %s\n", szMyIPAddress );
     }
 
     return ErrorCode_OK;
 
 }
 
-// Create XML from frame data and output to Unity
-void SendFrameToUnity(sFrameOfMocapData *data, void *pUserData)
+void SendDescriptionsToUnity( sDataDescriptions * dataDescriptions )
 {
-    if(data->Skeletons>0)
-    {  
-        // form XML document
+    //== lets send the skeleton descriptions to Unity ==--
 
-        TiXmlDocument doc;  
-        TiXmlDeclaration* decl = new TiXmlDeclaration( "1.0", "", "" );  
-        doc.LinkEndChild( decl );  
+    std::vector<int> skeletonDescriptions;
 
-        TiXmlElement * root = new TiXmlElement( "Stream" );  
-        doc.LinkEndChild( root );  
+    for( int index=0; index<dataDescriptions->nDataDescriptions; index++ )
+    {
+        if( dataDescriptions->arrDataDescriptions[ index ].type==Descriptor_Skeleton )
+        {
+            skeletonDescriptions.push_back( index );
+        }
+    }
 
-        TiXmlElement * skeletons = new TiXmlElement( "Skeletons" );  
-        root->LinkEndChild( skeletons );  
+    //== early out if no skeleton descriptions to stream ==--
 
-        // skeletons first
+    if( skeletonDescriptions.size()==0 )
+    {
+        return;
+    }
+
+    //== now we stream skeleton descriptions over XML ==--
+
+    std::ostringstream xml;
+
+    xml << "<?xml version=\"1.0\" ?>" << std::endl;
+    xml << "<Stream>" << std::endl;
+    xml << "<SkeletonDescriptions>" << std::endl;
+
+    // skeletons first
+
+    for( int descriptions=0; descriptions<(int) skeletonDescriptions.size(); descriptions++ )
+    {
+        int index = skeletonDescriptions[ descriptions ];
+
+        // Skeleton
+        sSkeletonDescription* pSK = dataDescriptions->arrDataDescriptions[ index ].Data.SkeletonDescription;
+
+        xml << "<SkeletonDescription ID=\"" << pSK->skeletonID << "\" ";
+        xml << "Name=\"" << pSK->szName << "\" ";
+        xml << "BoneCount=\"" << pSK->nRigidBodies << "\">" << std::endl;
+
+        for( int j=0; j < pSK->nRigidBodies; j++ )
+        {
+            sRigidBodyDescription* pRB = &pSK->RigidBodies[ j ];
+
+            xml << "<BoneDefs ID=\"" << pRB->ID << "\" ";
+
+            xml << "ParentID=\"" << pRB->parentID << "\" ";
+            xml << "Name=\"" << pRB->szName << "\" ";
+            xml << "x=\"" << pRB->offsetx << "\" ";
+            xml << "y=\"" << pRB->offsety << "\" ";
+            xml << "z=\"" << pRB->offsetz << "\"/>" << std::endl;
+        }
+
+        xml << "</SkeletonDescription>" << std::endl;
+    }
+
+    xml << "</SkeletonDescriptions>" << std::endl;
+    xml << "</Stream>" << std::endl;
+
+
+    // convert xml document into a buffer filled with data ==--
+
+    std::string str =  xml.str();
+    const char* buffer = str.c_str();
+
+    // stream xml data over UDP via SlipStream ==--
+
+    gSlipStream->Stream( (unsigned char *) buffer, (int) strlen( buffer ) );
+}
+
+
+
+// Create XML from frame data and output to Unity
+void SendFrameToUnity( sFrameOfMocapData *data, void *pUserData )
+{
+    if( data->Skeletons>0 )
+    {
+        std::ostringstream xml;
+
+        xml << "<?xml version=\"1.0\" ?>" << std::endl;
+        xml << "<Stream>" << std::endl;
+        xml << "<Skeletons>" << std::endl;
 
         for( int i=0; i<data->nSkeletons; i++ )
         {
-            TiXmlElement * skeleton = new TiXmlElement( "Skeleton" );  
-            skeletons->LinkEndChild( skeleton );  
+            sSkeletonData skData = data->Skeletons[ i ]; // first skeleton ==--
 
-            TiXmlElement * bone;
+            xml << "<Skeleton ID=\"" << skData.skeletonID << "\">" << std::endl;
 
-            sSkeletonData skData = data->Skeletons[i]; // first skeleton ==--
-
-            skeleton->SetAttribute("ID"  , skData.skeletonID);
-
-            for(int i=0; i<skData.nRigidBodies; i++)
+            for( int i=0; i<skData.nRigidBodies; i++ )
             {
-                sRigidBodyData rbData = skData.RigidBodyData[i];
+                sRigidBodyData rbData = skData.RigidBodyData[ i ];
 
-                bone = new TiXmlElement( "Bone" );  
-                skeleton->LinkEndChild( bone );  
-
-                bone->SetAttribute      ("ID"  , rbData.ID);
-                bone->SetAttribute      ("Name", gBoneNames[LOWORD(rbData.ID)].c_str());
-                bone->SetDoubleAttribute("x"   , rbData.x);
-                bone->SetDoubleAttribute("y"   , rbData.y);
-                bone->SetDoubleAttribute("z"   , rbData.z);
-                bone->SetDoubleAttribute("qx"  , rbData.qx);
-                bone->SetDoubleAttribute("qy"  , rbData.qy);
-                bone->SetDoubleAttribute("qz"  , rbData.qz);
-                bone->SetDoubleAttribute("qw"  , rbData.qw);
+                xml << "<Bone ID=\"" << rbData.ID << "\" ";
+                xml << "Name=\"" << gBoneNames[ LOWORD( rbData.ID )+skData.skeletonID*100 ].c_str() << "\" ";
+                xml << "x=\"" << rbData.x << "\" ";
+                xml << "y=\"" << rbData.y << "\" ";
+                xml << "z=\"" << rbData.z << "\" ";
+                xml << "qx=\"" << rbData.qx << "\" ";
+                xml << "qy=\"" << rbData.qy << "\" ";
+                xml << "qz=\"" << rbData.qz << "\" ";
+                xml << "qw=\"" << rbData.qw << "\" />" << std::endl;
             }
-        }
-        
-        // rigid bodies ==--
 
-        TiXmlElement * rigidBodies = new TiXmlElement( "RigidBodies" );  
-        root->LinkEndChild( rigidBodies );  
+            xml << "</Skeleton>" << std::endl;
+        }
+
+        xml << "</Skeletons>" << std::endl;
+        xml << "<RigidBodies>" << std::endl;
+
+        // rigid bodies ==--
 
         for( int i=0; i<data->nRigidBodies; i++ )
         {
-            sRigidBodyData rbData = data->RigidBodies[i];
+            sRigidBodyData rbData = data->RigidBodies[ i ];
 
-            TiXmlElement * rb = new TiXmlElement( "RigidBody" );  
-            rigidBodies->LinkEndChild( rb );  
-
-            rb->SetAttribute      ("ID"  , rbData.ID);
-            rb->SetDoubleAttribute("x"   , rbData.x);
-            rb->SetDoubleAttribute("y"   , rbData.y);
-            rb->SetDoubleAttribute("z"   , rbData.z);
-            rb->SetDoubleAttribute("qx"  , rbData.qx);
-            rb->SetDoubleAttribute("qy"  , rbData.qy);
-            rb->SetDoubleAttribute("qz"  , rbData.qz);
-            rb->SetDoubleAttribute("qw"  , rbData.qw);
+            xml << "<RigidBody ID=\"" << rbData.ID << "\" ";
+            xml << "x=\"" << rbData.x << "\" ";
+            xml << "y=\"" << rbData.y << "\" ";
+            xml << "z=\"" << rbData.z << "\" ";
+            xml << "qx=\"" << rbData.qx << "\" ";
+            xml << "qy=\"" << rbData.qy << "\" ";
+            xml << "qz=\"" << rbData.qz << "\" ";
+            xml << "qw=\"" << rbData.qw << "\" />" << std::endl;
         }
 
-        // convert xml document into a buffer filled with data ==--
 
-        std::ostringstream stream;
-        stream << doc;
-        std::string str =  stream.str();
+        xml << "</RigidBodies>" << std::endl;
+        xml << "</Stream>" << std::endl;
+
+        std::string str =  xml.str();
         const char* buffer = str.c_str();
 
         // stream xml data over UDP via SlipStream ==--
 
-        gSlipStream->Stream( (unsigned char *) buffer, (int) strlen(buffer) );
-    } 
+        gSlipStream->Stream( (unsigned char *) buffer, (int) strlen( buffer ) );
+    }
 }
 
+
+double gLastDescription=0;
+
 // DataHandler receives data from the server
-void __cdecl DataHandler(sFrameOfMocapData* data, void* pUserData)
+void __cdecl DataHandler( sFrameOfMocapData* data, void* pUserData )
 {
-	NatNetClient* pClient = (NatNetClient*) pUserData;
+    NatNetClient* pClient = (NatNetClient*) pUserData;
 
-	printf("Received frame %d\n", data->iFrame);
+    catchUp();
 
-    SendFrameToUnity(data, pUserData);
+    if( gIndicator==Listening )
+    {
+        gIndicator=Streaming;
+        printf("[UnityClient] Receiving data and streaming to Unity3D\n");
+    }
+
+    SendFrameToUnity( data, pUserData );
+
+    double timer = data->fTimestamp;
+
+    if( timer-gLastDescription>1 || gLastDescription>timer )
+    {
+        //== stream skeleton definitions once per second ==--
+        gLastDescription = timer;
+        sDataDescriptions* pDataDefs = NULL;
+        int nBodies = theClient->GetDataDescriptions( &pDataDefs );
+        if( pDataDefs )
+        {
+            for( int i=0; i < pDataDefs->nDataDescriptions; i++ )
+            {
+                if( pDataDefs->arrDataDescriptions[ i ].type == Descriptor_Skeleton )
+                {
+                    // Skeleton
+                    sSkeletonDescription* pSK = pDataDefs->arrDataDescriptions[ i ].Data.SkeletonDescription;
+                    for( int j=0; j < pSK->nRigidBodies; j++ )
+                    {
+                        sRigidBodyDescription* pRB = &pSK->RigidBodies[ j ];
+                        // populate bone name dictionary for use in xml ==--
+                        gBoneNames[ pRB->ID+pSK->skeletonID*100 ] = pRB->szName;
+                    }
+                }
+            }
+            SendDescriptionsToUnity( pDataDefs );
+        }
+    }
 }
 
 // MessageHandler receives NatNet error/debug messages

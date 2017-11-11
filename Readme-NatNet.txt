@@ -8,6 +8,24 @@ Please refer to the NatNet API USer's Guide for more information.
 
 Change Log
 -----------
+Version 2.10.0 (06/15/2016)
+-----------------------
+
+Fixed: Issue where WinFormsTestApp crashed on exit.
+
+Fixed: Issue where WinFormsTestApp became non-responsive after selecting multiple items.
+
+Updated: The User Guide to include new information and correct formatting / grammatical errors.
+
+Added: NatNet Unity3D sample code for skeleton re-targeting using Mecanim.
+
+Added: NatNet Python depacketization client into NatNet SDK Samples directory.
+
+Added: Reference to open source NatNet based Maya plug in.
+
+Added: A 'keep alive' streaming command to resolve issues with UDP unicast clients going to sleep.
+
+
 Version 2.9.0 (10/11/2015)
 -----------------------
 

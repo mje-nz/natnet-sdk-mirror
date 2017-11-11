@@ -42,6 +42,9 @@ public:
     bool TimecodeStringify(unsigned int inTimecode, unsigned int inTimecodeSubframe, char *Buffer, int BufferSize);
     void DecodeID(unsigned int inID, int* entityID, int* memeberID);
 
+    void CopyFrame(sFrameOfMocapData* pSrc, sFrameOfMocapData* pDst);
+    void FreeFrame(sFrameOfMocapData* pFrame);
+
 private:
 
     ClientCore* m_pClientCore;

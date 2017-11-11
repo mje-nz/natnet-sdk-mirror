@@ -41,6 +41,8 @@ public class SlipStream : MonoBehaviour
 	
 	public event PacketReceivedHandler PacketNotification;
 	
+    private int PacketsReceived = 0;
+   
 	private IPEndPoint mRemoteIpEndPoint;
 	private Socket     mListener;
 	private byte[]     mReceiveBuffer;
@@ -91,7 +93,9 @@ public class SlipStream : MonoBehaviour
 						if(lastPacket)
 						{
 							//== ok packet has been created from sub packets and is complete ==--
-							
+
+                            PacketsReceived++;
+
 							//== notify listeners ==--
 							
 							if(PacketNotification!=null)
@@ -99,14 +103,14 @@ public class SlipStream : MonoBehaviour
 						}
 					}			
 				}
-								
+
 				bytesReceived = mListener.Receive(mReceiveBuffer);
 
 				//== time this out of packets are coming in faster than we can process ==--
 				maxSubPacketProcess--;
 			}
 		}
-		catch(System.Exception ex)
+		catch(System.Exception)
 		{}
 	}
  

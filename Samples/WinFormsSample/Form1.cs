@@ -65,6 +65,7 @@ namespace WinFormTestApp
         Hashtable htMarkers = new Hashtable();
         Hashtable htRigidBodies = new Hashtable();
         List<RigidBody> mRigidBodies = new List<RigidBody>();
+        Hashtable htSkelRBs = new Hashtable();
 
         Hashtable htForcePlates = new Hashtable();
         List<ForcePlate> mForcePlates = new List<ForcePlate>();
@@ -72,6 +73,7 @@ namespace WinFormTestApp
         // graphing support
         const int GraphFrames = 500;
         int m_iLastFrameNumber = 0;
+        const int maxSeriesCount = 10;
 
         // frame timing information
         double m_fLastFrameTimestamp = 0.0f;
@@ -96,6 +98,7 @@ namespace WinFormTestApp
         // UI updating
         delegate void UpdateUICallback();
         bool mApplicationRunning = true;
+        Thread UIUpdateThread;
 
         // polling
         delegate void PollCallback();
@@ -132,7 +135,7 @@ namespace WinFormTestApp
 
             // create data chart
             chart1.Series.Clear();
-            for (int i = 0; i < 5; i++)
+            for (int i = 0; i < maxSeriesCount; i++)
             {
                 System.Windows.Forms.DataVisualization.Charting.Series series = chart1.Series.Add("Series" + i.ToString());
                 series.ChartType = System.Windows.Forms.DataVisualization.Charting.SeriesChartType.FastLine;
@@ -142,7 +145,7 @@ namespace WinFormTestApp
 
             // create and run an Update UI thread
             UpdateUICallback d = new UpdateUICallback(UpdateUI);
-            var thread = new Thread(() =>
+            UIUpdateThread = new Thread(() =>
             {
                 while (mApplicationRunning)
                 {
@@ -158,7 +161,7 @@ namespace WinFormTestApp
                     }
                 }
             });
-            thread.Start();
+            UIUpdateThread.Start();
 
             // create and run a polling thread
             PollCallback pd = new PollCallback(PollData);
@@ -337,6 +340,9 @@ namespace WinFormTestApp
             if (mPaused)
                 return;
 
+            if(!mApplicationRunning)
+                return;
+
             if (this.listView1.InvokeRequired)
             {
                 // It's on a different thread, so use Invoke
@@ -354,12 +360,22 @@ namespace WinFormTestApp
             }
         }
 
-        private RigidBody FindRB(int id)
+        private RigidBody FindRB(int id, int parentID = -2)
         {
             foreach (RigidBody rb in mRigidBodies)
             {
                 if (rb.ID == id)
-                    return rb;
+                {
+                    if(parentID != -2)
+                    {
+                        if(rb.parentID == parentID)
+                            return rb;
+                    }
+                    else
+                    {
+                        return rb;
+                    }
+                }
             }
             return null;
         }
@@ -382,6 +398,10 @@ namespace WinFormTestApp
 
             for (int i = 0; i < dataGridView1.SelectedCells.Count; i++)
             {
+                // for simple performance only graph maxSeriesCount lines
+                if (i >= maxSeriesCount)
+                    break;
+
                 DataGridViewCell cell = dataGridView1.SelectedCells[i];
                 if (cell.Value == null)
                     return;
@@ -435,22 +455,30 @@ namespace WinFormTestApp
                 if (!htRigidBodies.ContainsKey(key))
                 {
                     // Add RigidBody def to the grid
-                    if (rb.Markers[0].ID != -1)
+                    if ((rb.Markers[0] != null) && (rb.Markers[0].ID != -1))
                     {
+                        string name;
                         RigidBody rbDef = FindRB(rb.ID);
                         if (rbDef != null)
                         {
-                            int rowIndex = dataGridView1.Rows.Add("RigidBody: " + rbDef.Name);
-                            key = rb.ID.GetHashCode();
-                            htRigidBodies.Add(key, rowIndex);
-                            // Add Markers associated with this rigid body to the grid
-                            for (int j = 0; j < rb.nMarkers; j++)
-                            {
-                                String strUniqueName = rbDef.Name + "-" + rb.Markers[j].ID.ToString();
-                                int keyMarker = strUniqueName.GetHashCode();
-                                int newRowIndexMarker = dataGridView1.Rows.Add(strUniqueName);
-                                htMarkers.Add(keyMarker, newRowIndexMarker);
-                            }
+                            name = rbDef.Name;
+                        }
+                        else
+                        {
+                            name = rb.ID.ToString();
+                        }
+
+                        int rowIndex = dataGridView1.Rows.Add("RigidBody: " + name);
+                        key = rb.ID.GetHashCode();
+                        htRigidBodies.Add(key, rowIndex);
+                        
+                        // Add Markers associated with this rigid body to the grid
+                        for (int j = 0; j < rb.nMarkers; j++)
+                        {
+                            String strUniqueName = name + "-" + rb.Markers[j].ID.ToString();
+                            int keyMarker = strUniqueName.GetHashCode();
+                            int newRowIndexMarker = dataGridView1.Rows.Add(strUniqueName);
+                            htMarkers.Add(keyMarker, newRowIndexMarker);
                         }
                     }
                 }
@@ -497,20 +525,28 @@ namespace WinFormTestApp
                         {
                             if (rb.Markers[j].ID != -1)
                             {
+                                string name;
                                 RigidBody rbDef = FindRB(rb.ID);
                                 if (rbDef != null)
                                 {
-                                    String strUniqueName = rbDef.Name + "-" + rb.Markers[j].ID.ToString();
-                                    int keyMarker = strUniqueName.GetHashCode();
-                                    if (htMarkers.ContainsKey(keyMarker))
-                                    {
-                                        int rowIndexMarker = (int)htMarkers[keyMarker];
-                                        NatNetML.Marker m = rb.Markers[j];
-                                        dataGridView1.Rows[rowIndexMarker].Cells[1].Value = m.x;
-                                        dataGridView1.Rows[rowIndexMarker].Cells[2].Value = m.y;
-                                        dataGridView1.Rows[rowIndexMarker].Cells[3].Value = m.z;
-                                    }
+                                    name = rbDef.Name;
                                 }
+                                else
+                                {
+                                    name = rb.ID.ToString();
+                                }
+
+                                String strUniqueName = name + "-" + rb.Markers[j].ID.ToString();
+                                int keyMarker = strUniqueName.GetHashCode();
+                                if (htMarkers.ContainsKey(keyMarker))
+                                {
+                                    int rowIndexMarker = (int)htMarkers[keyMarker];
+                                    NatNetML.Marker m = rb.Markers[j];
+                                    dataGridView1.Rows[rowIndexMarker].Cells[1].Value = m.x;
+                                    dataGridView1.Rows[rowIndexMarker].Cells[2].Value = m.y;
+                                    dataGridView1.Rows[rowIndexMarker].Cells[3].Value = m.z;
+                                }
+
                             }
                         }
                     }
@@ -531,7 +567,32 @@ namespace WinFormTestApp
                     int rigidBodyID = LowWord(rb.ID);
                     int uniqueID = skeletonID * 1000 + rigidBodyID;
                     int key = uniqueID.GetHashCode();
-                    if (htRigidBodies.ContainsKey(key))
+                    
+                    // note : must add rb definitions here one time instead of on get data descriptions because we don't know the marker list yet.
+                    if (!htRigidBodies.ContainsKey(key))
+                    {
+                        // Add RigidBody def to the grid
+                        if ( (rb.Markers[0] != null) && (rb.Markers[0].ID != -1))
+                        {
+                            int key1 = sk.ID * 1000 + rigidBodyID;
+                            RigidBody rbDef = (RigidBody) htSkelRBs[key1];
+                            if (rbDef != null)
+                            {
+                                int rowIndex = dataGridView1.Rows.Add("Bone: " + rbDef.Name);
+                                htRigidBodies.Add(key, rowIndex);
+                                // Add Markers associated with this rigid body to the grid
+                                for (int k = 0; k < rb.nMarkers; k++)
+                                {
+                                    String strUniqueName = rbDef.Name + "-" + rb.Markers[k].ID.ToString();
+                                    int keyMarker = strUniqueName.GetHashCode();
+                                    int newRowIndexMarker = dataGridView1.Rows.Add(strUniqueName);
+                                    htMarkers.Add(keyMarker, newRowIndexMarker);
+                                }
+
+                            }
+                        }
+                    }
+                    else 
                     {
                         int rowIndex = (int)htRigidBodies[key];
                         if (rowIndex >= 0)
@@ -553,9 +614,23 @@ namespace WinFormTestApp
                             dataGridView1.Rows[rowIndex].Cells[6].Value = z;
 
                             // Marker data associated with this rigid body
-                            for (int k = 0; k < rb.nMarkers; k++)
+                            int key1 = sk.ID * 1000 + rigidBodyID;
+                            RigidBody rbDef = (RigidBody)htSkelRBs[key1];
+                            if (rbDef != null)
                             {
-
+                                for (int k = 0; k < rb.nMarkers; k++)
+                                {
+                                    String strUniqueName = rbDef.Name + "-" + rb.Markers[k].ID.ToString();
+                                    int keyMarker = strUniqueName.GetHashCode();
+                                    if (htMarkers.ContainsKey(keyMarker))
+                                    {
+                                        int rowIndexMarker = (int)htMarkers[keyMarker];
+                                        NatNetML.Marker m = rb.Markers[k];
+                                        dataGridView1.Rows[rowIndexMarker].Cells[1].Value = m.x;
+                                        dataGridView1.Rows[rowIndexMarker].Cells[2].Value = m.y;
+                                        dataGridView1.Rows[rowIndexMarker].Cells[3].Value = m.z;
+                                    }
+                                }
                             }
                         }
                     }
@@ -644,6 +719,7 @@ namespace WinFormTestApp
             dataGridView1.Rows.Clear();
             htMarkers.Clear();
             htRigidBodies.Clear();
+            htSkelRBs.Clear();
             needMarkerListUpdate = true;
 
             OutputMessage("Retrieving Data Descriptions....");
@@ -722,6 +798,11 @@ namespace WinFormTestApp
                             OutputMessage(" OffsetX  : " + rb.offsetx);
                             OutputMessage(" OffsetY  : " + rb.offsety);
                             OutputMessage(" OffsetZ  : " + rb.offsetz);
+
+                            //mRigidBodies.Add(rb);
+                            int key = sk.ID * 1000 + rb.ID;
+                            htSkelRBs.Add(key, rb);
+#if false
                             int rowIndex = dataGridView1.Rows.Add("Bone: " + rb.Name);
                             // RigidBodyIDToRow map
                             int uniqueID = sk.ID * 1000 + rb.ID;
@@ -730,6 +811,8 @@ namespace WinFormTestApp
                                 MessageBox.Show("Duplicate RigidBody ID");
                             else
                                 htRigidBodies.Add(key, rowIndex);
+#endif
+
                         }
                     }
                     // ForcePlates
@@ -1070,6 +1153,10 @@ namespace WinFormTestApp
         private void Form1_FormClosing(object sender, FormClosingEventArgs e)
         {
             mApplicationRunning = false;
+
+            if(UIUpdateThread.IsAlive)
+                UIUpdateThread.Abort();
+
             m_NatNet.Uninitialize();
         }
 

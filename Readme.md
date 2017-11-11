@@ -5,6 +5,23 @@ This repository contains each version of NaturalPoint's [NatNet SDK](http://opti
 
 ## Changelog
 
+__2.10.0__ _(June 27, 2016)_
+
+Features & Enhancements
+
+* Updated the User Guide to include new information and correct formatting / grammatical errors.
+* Added NatNet Unity3D sample code for skeleton re-targeting using Mecanim.
+* Added NatNet Python depacketization client into NatNet SDK Samples directory.
+* Added reference to open source NatNet based Maya plug in.
+* Added 'keep alive' streaming command to resolve issues with UDP unicast clients going to sleep.
+
+Fixes
+
+* Fixed issue where WinFormsTestApp crashed on exit.
+* Fixed crash in WinFormsTestApp when streaming more than 44 rigid bodies.
+* Fixed issue where WinFormsTestApp became non-responsive after selecting multiple items.
+
+
 __2.9.0__ _(October 19, 2015)_
 
 Features & Enhancements

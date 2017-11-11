@@ -78,7 +78,8 @@
     <Reference Include="Accessibility">
       <EmbedInteropTypes>True</EmbedInteropTypes>
     </Reference>
-    <Reference Include="NatNetML">
+    <Reference Include="NatNetML, Version=2.8.5938.27320, Culture=neutral, processorArchitecture=x86">
+      <SpecificVersion>False</SpecificVersion>
       <HintPath>..\..\lib\NatNetML.dll</HintPath>
     </Reference>
     <Reference Include="System" />

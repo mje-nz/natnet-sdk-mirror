@@ -2,7 +2,7 @@
 NatNetTypes defines the public, common data structures and types
 used when working with NatNetServer and NatNetClient objects.
 
-version 2.8.0.0
+version 2.10.0.0
 */
 
 #pragma once
@@ -48,6 +48,8 @@ version 2.8.0.0
 #define NAT_FRAMEOFDATA             7
 #define NAT_MESSAGESTRING           8
 #define NAT_DISCONNECT              9 
+#define NAT_KEEPALIVE               10
+#define NAT_DISCONNECTBYTIMEOUT     11
 #define NAT_UNRECOGNIZED_REQUEST    100
 
 #define UNDEFINED                   999999.9999
@@ -218,7 +220,7 @@ typedef struct
     float fLength;                                  // plate physical length (manufacturer supplied)
     float fOriginX, fOriginY, fOriginZ;             // electrical center offset (from electrical center to geometric center-top of force plate) (manufacturer supplied)
     float fCalMat[12][12];                          // force plate calibration matrix (for raw analog voltage channel type only)
-    float fCorners[4][3];                           // plate corners, in plate coordinates, clockwise from plate +x,+y (refer to C3D spec for details)
+    float fCorners[4][3];                           // plate corners, in world (aka Mocap System) coordinates, clockwise from plate +x,+y (refer to C3D spec for details)
     int iPlateType;                                 // force plate 'type' (refer to C3D spec for details) 
     int iChannelDataType;                           // 0=Calibrated force data, 1=Raw analog voltages
     int nChannels;                                  // # of channels (signals)
@@ -279,7 +281,7 @@ typedef struct
     sMarker LabeledMarkers[MAX_LABELED_MARKERS];    // Labeled Marker data (labeled markers not associated with a "MarkerSet")
     int nForcePlates;                               // # of force plates
     sForcePlateData ForcePlates[MAX_FORCEPLATES];   // Force plate data
-    float fLatency;                                 // host defined time delta between capture and send
+    float fLatency;                                 // host defined time difference between capture and send, not necessarily frame accurate.
     unsigned int Timecode;                          // SMPTE timecode (if available)
     unsigned int TimecodeSubframe;                  // timecode sub-frame data
     double fTimestamp;                              // FrameGroup timestamp
