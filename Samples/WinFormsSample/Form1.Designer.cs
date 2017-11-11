@@ -76,6 +76,7 @@ namespace WinFormTestApp
             this.SetRecordingTakeButton = new System.Windows.Forms.Button();
             this.RecordingTakeNameText = new System.Windows.Forms.TextBox();
             this.EditModeButton = new System.Windows.Forms.Button();
+            this.TimestampLabel = new System.Windows.Forms.Label();
             ((System.ComponentModel.ISupportInitialize)(this.dataGridView1)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.chart1)).BeginInit();
             this.tabControl1.SuspendLayout();
@@ -370,6 +371,7 @@ namespace WinFormTestApp
             // 
             // tabPage1
             // 
+            this.tabPage1.Controls.Add(this.TimestampLabel);
             this.tabPage1.Controls.Add(this.comboBoxLocal);
             this.tabPage1.Controls.Add(this.label3);
             this.tabPage1.Controls.Add(this.checkBoxConnect);
@@ -528,6 +530,14 @@ namespace WinFormTestApp
             this.EditModeButton.UseVisualStyleBackColor = true;
             this.EditModeButton.Click += new System.EventHandler(this.EditModeButton_Click);
             // 
+            // TimestampLabel
+            // 
+            this.TimestampLabel.AutoSize = true;
+            this.TimestampLabel.Location = new System.Drawing.Point(247, 108);
+            this.TimestampLabel.Name = "TimestampLabel";
+            this.TimestampLabel.Size = new System.Drawing.Size(0, 13);
+            this.TimestampLabel.TabIndex = 18;
+            // 
             // Form1
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
@@ -592,6 +602,7 @@ namespace WinFormTestApp
         private System.Windows.Forms.DataGridViewTextBoxColumn Roll;
         private System.Windows.Forms.Button SetPlaybackTakeButton;
         private System.Windows.Forms.TextBox PlaybackTakeNameText;
+        private System.Windows.Forms.Label TimestampLabel;
     }
 }
 

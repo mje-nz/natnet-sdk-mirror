@@ -10,6 +10,31 @@ Please refer to the NatNet API USer's Guide for more information.
 Change Log
 -----------
 
+Version 2.6.0 (4/2014)
+------------------------------
+Added:   Motive 1.6 Streaming support
+
+Added:   RigidBody tracking state parameter
+
+Added:   IsRecording flag on FrameOfMocapData indicating frame was recorded in Motive
+
+Added:   ModelsChanged flag on FrameOfMocapData indicating actively tracked model list has changed.
+
+Added:   Additional flags on LabelMarkerList indicating marker occlusion and marker position
+         calculation method.
+
+Added:   Additional FrameOfMocapData timestamp
+
+Added:   NatCap remote capture sample for illustring send/receive remote Motive control commands via
+         UDP broadcast direct.
+
+Added:   UDP Repeater / Unity3D
+
+Changed: Increase unlabeled/other marker count cap to 1000
+
+Fixed:   SampleClient latency value
+
+
 Version 2.5.0 (9/2013)
 ------------------------------
 Added:   Motive 1.5 streaming support.

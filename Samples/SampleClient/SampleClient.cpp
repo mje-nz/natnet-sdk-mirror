@@ -1,5 +1,5 @@
 //=============================================================================
-// Copyright © 2010 NaturalPoint, Inc. All Rights Reserved.
+// Copyright © 2014 NaturalPoint, Inc. All Rights Reserved.
 // 
 // This software is provided by the copyright holders and contributors "as is" and
 // any express or implied warranties, including, but not limited to, the implied
@@ -309,21 +309,25 @@ void __cdecl DataHandler(sFrameOfMocapData* data, void* pUserData)
 {
 	NatNetClient* pClient = (NatNetClient*) pUserData;
 
-	printf("Received frame %d\n", data->iFrame);
-
 	if(fp)
 		_WriteFrame(fp,data);
-	int i=0;
 	
-    // same system latency test
-    float fThisTick = (float)GetTickCount();
-    float fDiff = fThisTick - data->fLatency;
-    double dDuration = fDiff;
-    printf("Latency (same system) (msecs): %3.2lf\n", dDuration);
+    int i=0;
 
-
-	// timecode
-	// decode to values
+    printf("FrameID : %d\n", data->iFrame);
+    printf("Timestamp :  %3.2lf\n", data->fTimestamp);
+    printf("Latency :  %3.2lf\n", data->fLatency);
+    
+    // FrameOfMocapData params
+    bool bIsRecording = data->params & 0x01;
+    bool bTrackedModelsChanged = data->params & 0x02;
+    if(bIsRecording)
+        printf("RECORDING\n");
+    if(bTrackedModelsChanged)
+        printf("Models Changed.\n");
+	
+        
+    // timecode - for systems with an eSync and SMPTE timecode generator - decode to values
 	int hour, minute, second, frame, subframe;
 	bool bValid = pClient->DecodeTimecode(data->Timecode, data->TimecodeSubframe, &hour, &minute, &second, &frame, &subframe);
 	// decode to friendly string
@@ -346,7 +350,11 @@ void __cdecl DataHandler(sFrameOfMocapData* data, void* pUserData)
 	printf("Rigid Bodies [Count=%d]\n", data->nRigidBodies);
 	for(i=0; i < data->nRigidBodies; i++)
 	{
-		printf("Rigid Body [ID=%d  Error=%3.2f]\n", data->RigidBodies[i].ID, data->RigidBodies[i].MeanError);
+        // params
+        // 0x01 : bool, rigid body was successfully tracked in this frame
+        bool bTrackingValid = data->RigidBodies[i].params & 0x01;
+
+		printf("Rigid Body [ID=%d  Error=%3.2f  Valid=%d]\n", data->RigidBodies[i].ID, data->RigidBodies[i].MeanError, bTrackingValid);
 		printf("\tx\ty\tz\tqx\tqy\tqz\tqw\n");
 		printf("\t%3.2f\t%3.2f\t%3.2f\t%3.2f\t%3.2f\t%3.2f\t%3.2f\n",
 			data->RigidBodies[i].x,
@@ -403,11 +411,18 @@ void __cdecl DataHandler(sFrameOfMocapData* data, void* pUserData)
 	}
 
 	// labeled markers
+    bool bOccluded;     // marker was not visible (occluded) in this frame
+    bool bPCSolved;     // reported position provided by point cloud solve
+    bool bModelSolved;  // reported position provided by model solve
 	printf("Labeled Markers [Count=%d]\n", data->nLabeledMarkers);
 	for(i=0; i < data->nLabeledMarkers; i++)
 	{
+        bOccluded = data->LabeledMarkers[i].params & 0x01;
+        bPCSolved = data->LabeledMarkers[i].params & 0x02;
+        bModelSolved = data->LabeledMarkers[i].params & 0x04;
 		sMarker marker = data->LabeledMarkers[i];
-		printf("Labeled Marker [ID=%d] [size=%3.2f] [pos=%3.2f,%3.2f,%3.2f]\n", marker.ID, marker.size, marker.x, marker.y, marker.z);
+		printf("Labeled Marker [ID=%d, Occluded=%d, PCSolved=%d, ModelSolved=%d] [size=%3.2f] [pos=%3.2f,%3.2f,%3.2f]\n",
+            marker.ID, bOccluded, bPCSolved, bModelSolved,  marker.size, marker.x, marker.y, marker.z);
 	}
 
 }

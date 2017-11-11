@@ -674,7 +674,14 @@ namespace WinFormTestApp
                             chart1.Invalidate();
                         }
                         
-                        m_fLastFrameTimestamp = m_FrameOfData.fLatency;        
+                        m_fLastFrameTimestamp = m_FrameOfData.fLatency;
+
+                        TimestampLabel.Text = m_FrameOfData.fLatency.ToString();
+
+                        if (m_FrameOfData.bRecording)
+                            chart1.BackColor = Color.Red;
+                        else
+                            chart1.BackColor = Color.White;
 
                     }
 

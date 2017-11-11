@@ -1,9 +1,5 @@
-#if !defined(_UTILS_H_INCLUDED_)
-#define _UTILS_H_INCLUDED_
-
-#if _MSC_VER > 1000
-#pragma once
-#endif
+#ifndef _NATUTILS_H_
+#define _NATUTILS_H_
 
 // Euler angle support copyright Ken Shoemake, 1993
 
@@ -89,6 +85,7 @@ typedef float HMatrix[4][4]; /* Right-handed, for column vectors */
 #define EulOrdXYZr    EulOrd(Z,EulParOdd,EulRepNo,EulFrmR)
 #define EulOrdZYZr    EulOrd(Z,EulParOdd,EulRepYes,EulFrmR)
 
+// Global Functions for Euler angles.
 EulerAngles Eul_(float ai, float aj, float ah, int order);
 Quat Eul_ToQuat(EulerAngles ea);
 void Eul_ToHMatrix(EulerAngles ea, HMatrix M);
@@ -106,10 +103,63 @@ public:
     static int GetLocalIPAddresses2(unsigned long Addresses[], int nMax);
 
     // math helpers
-    static void quatToMatrix(double *q, double *m);
-    static void vec3MatrixMult(double *v, double *m);
-    static void Matrix3AndPosToMatrix4(double* m3, double* v, double* m4);
+
+    //////////////////////////////////////////////////////////////////////////
+    /// <summary>
+    /// Converts a quaternion to a rotation matrix.
+    /// </summary>
+    /// <param name='q'>Quaternion stored in x, y, z, w order.</param>
+    /// <param name='m'>Pointer to an array of length 9. Rotation matrix
+    /// is placed into this array in column major order.</param>
+    //////////////////////////////////////////////////////////////////////////
+    template<typename T>
+    static void QaternionToRotationMatrix(T *q, T*m);
+
+    //////////////////////////////////////////////////////////////////////////
+    /// <summary>
+    /// Multiplies a vector with 3 components by a 3 x 3 matrix and overwrites
+    /// the input vector with the result.
+    /// </summary>
+    /// <param name='v'>On input a vector with 3 components. On output the 
+    /// result of the multiplication.</param>
+    /// <param name='m'>3 x 3 matrix stored in column major order</param>
+    //////////////////////////////////////////////////////////////////////////
+    template<typename T>
+    static void Vec3MatrixMult(T *v, T*m);
+
+    //////////////////////////////////////////////////////////////////////////
+    /// <summary>
+    /// Converts radians to degrees.
+    /// </summary>
+    /// <param name='fRadians'>Radians.</param>
+    /// <returns>Degrees.</returns>
+    //////////////////////////////////////////////////////////////////////////
+    static float RadiansToDegrees(float fRadians)
+    {
+      return fRadians * (180.0F / 3.14159265F);
+    }
 
 };
 
-#endif
+
+template<typename T>
+void NATUtils::QaternionToRotationMatrix(T *q, T *m)
+{
+  m[0] = 1-2*q[Y]*q[Y]-2*q[Z]*q[Z]; m[1] = 2*q[X]*q[Y]-2*q[W]*q[Z];   m[2] = 2*q[X]*q[Z]+2*q[W]*q[Y];
+  m[3] = 2*q[X]*q[Y]+2*q[W]*q[Z];   m[4] = 1-2*q[X]*q[X]-2*q[Z]*q[Z]; m[5] = 2*q[Y]*q[Z]-2*q[W]*q[X];
+  m[6] = 2*q[X]*q[Z]-2*q[W]*q[Y];   m[7] = 2*q[Y]*q[Z]+2*q[W]*q[X];   m[8] = 1-2*q[X]*q[X]-2*q[Y]*q[Y];
+}
+
+
+template<typename T>
+void NATUtils::Vec3MatrixMult(T *v, T *m)
+{
+  float x = v[0]*m[0]+v[1]*m[3]+v[2]*m[6];
+  float y = v[0]*m[1]+v[1]*m[4]+v[2]*m[7];
+  float z = v[0]*m[2]+v[1]*m[5]+v[2]*m[8];
+  v[0] = x;
+  v[1] = y;
+  v[2] = z;
+}
+
+#endif // _NATUTILS_H_

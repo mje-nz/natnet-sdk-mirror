@@ -10,6 +10,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "PacketClient", "PacketClien
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WinFormsSampleVS2010", "WinFormsSample\WinFormsSampleVS2010.csproj", "{67EDA367-3B99-4738-A8BE-36AA1696529A}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "UnitySample", "Unity3D\UnitySample.vcxproj", "{F6922147-C3F4-4B3E-998F-42AC5A1E0AF8}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32
@@ -70,6 +72,16 @@ Global
 		{67EDA367-3B99-4738-A8BE-36AA1696529A}.Release|x64.Build.0 = Release|x64
 		{67EDA367-3B99-4738-A8BE-36AA1696529A}.Release|x86.ActiveCfg = Release|x86
 		{67EDA367-3B99-4738-A8BE-36AA1696529A}.Release|x86.Build.0 = Release|x86
+		{F6922147-C3F4-4B3E-998F-42AC5A1E0AF8}.Debug|Win32.ActiveCfg = Debug|Win32
+		{F6922147-C3F4-4B3E-998F-42AC5A1E0AF8}.Debug|Win32.Build.0 = Debug|Win32
+		{F6922147-C3F4-4B3E-998F-42AC5A1E0AF8}.Debug|x64.ActiveCfg = Debug|x64
+		{F6922147-C3F4-4B3E-998F-42AC5A1E0AF8}.Debug|x64.Build.0 = Debug|x64
+		{F6922147-C3F4-4B3E-998F-42AC5A1E0AF8}.Debug|x86.ActiveCfg = Debug|x64
+		{F6922147-C3F4-4B3E-998F-42AC5A1E0AF8}.Release|Win32.ActiveCfg = Release|Win32
+		{F6922147-C3F4-4B3E-998F-42AC5A1E0AF8}.Release|Win32.Build.0 = Release|Win32
+		{F6922147-C3F4-4B3E-998F-42AC5A1E0AF8}.Release|x64.ActiveCfg = Release|x64
+		{F6922147-C3F4-4B3E-998F-42AC5A1E0AF8}.Release|x64.Build.0 = Release|x64
+		{F6922147-C3F4-4B3E-998F-42AC5A1E0AF8}.Release|x86.ActiveCfg = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -163,45 +163,6 @@ int NATUtils::GetLocalIPAddresses(unsigned long Addresses[], int nMax)
     return nAddresses;
 }
 
-void NATUtils::quatToMatrix(double *q, double *m)
-{
-    m[0] = 1-2*q[1]*q[1]-2*q[2]*q[2]; m[1] = 2*q[0]*q[1]-2*q[3]*q[2];   m[2] = 2*q[0]*q[2]+2*q[3]*q[1];
-    m[3] = 2*q[0]*q[1]+2*q[3]*q[2];   m[4] = 1-2*q[0]*q[0]-2*q[2]*q[2]; m[5] = 2*q[1]*q[2]-2*q[3]*q[0];
-    m[6] = 2*q[0]*q[2]-2*q[3]*q[1];   m[7] = 2*q[1]*q[2]+2*q[3]*q[0];   m[8] = 1-2*q[0]*q[0]-2*q[1]*q[1];
-}
-
-void NATUtils::vec3MatrixMult(double *v, double *m)
-{
-    float x = v[0]*m[0]+v[1]*m[3]+v[2]*m[6];
-    float y = v[0]*m[1]+v[1]*m[4]+v[2]*m[7];
-    float z = v[0]*m[2]+v[1]*m[5]+v[2]*m[8];
-    v[0] = x;
-    v[1] = y;
-    v[2] = z;
-}
-
-void NATUtils::Matrix3AndPosToMatrix4(double* m3, double* v, double* m4)
-{
-    m4[0] = m3[0];
-    m4[1] = m3[1];
-    m4[2] = m3[2];
-    m4[3] = 0.0f;
-
-    m4[4] = m3[3];
-    m4[5] = m3[4];
-    m4[6] = m3[5];
-    m4[7] = 0.0f;
-
-    m4[8] = m3[6];
-    m4[9] = m3[7];
-    m4[10] = m3[8];
-    m4[11] = 0.0f;
-
-    m4[12] = v[0];
-    m4[13] = v[1];
-    m4[14] = v[2];
-    m4[15] = 1.0f;
-}
 
 EulerAngles Eul_(float ai, float aj, float ah, int order)
 {

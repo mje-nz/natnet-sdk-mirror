@@ -2,7 +2,7 @@
 NatNetTypes defines the public, common data structures and types
 used when working with NatNetServer and NatNetClient objects.
 
-version 2.5.0.0
+version 2.6.0.0
 */
 
 #pragma once
@@ -29,6 +29,7 @@ version 2.5.0.0
 #define MAX_SKELETONS               100     // maximum number of skeletons
 #define MAX_SKELRIGIDBODIES         200     // maximum number of RididBodies per Skeleton
 #define MAX_LABELED_MARKERS         1000    // maximum number of labeled markers per frame
+#define MAX_UNLABELED_MARKERS       1000    // maximum number of unlabeled (other) markers per frame
 
 #define MAX_PACKETSIZE				100000	// max size of packet (actual packet size is dynamic)
 
@@ -138,6 +139,7 @@ typedef struct
     float y;                                // y position
     float z;                                // z position
     float size;                             // marker size
+    short params;                            // host defined parameters
 } sMarker;
 
 // MarkerSet Definition
@@ -178,9 +180,10 @@ typedef struct sRigidBodyData
     int* MarkerIDs;                         // Array of marker IDs
     float* MarkerSizes;                     // Array of marker sizes
     float MeanError;                        // Mean measure-to-solve deviation
+    short params;                           // Host defined tracking flags
     sRigidBodyData()
     {
-        Markers = 0; MarkerIDs = 0; MarkerSizes = 0;
+        Markers = 0; MarkerIDs = 0; MarkerSizes = 0; params=0;
     }
 } sRigidBodyData;
 
@@ -241,5 +244,7 @@ typedef struct
     float fLatency;                             // host defined time delta between capture and send
     unsigned int Timecode;                      // SMPTE timecode (if available)
     unsigned int TimecodeSubframe;              // timecode sub-frame data
+    float fTimestamp;                           // FrameGroup timestamp
+    short params;                               // host defined parameters
 
 } sFrameOfMocapData;

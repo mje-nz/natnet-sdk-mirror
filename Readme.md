@@ -5,7 +5,27 @@ This repository contains each version of NaturalPoint's [NatNet SDK](http://opti
 
 ## Changelog
 
-__2.5__ _(October 2013)_
+__2.6__ _(May 8, 2014)_
+
+
+Features & Enhancements
+
+* Added Motive 1.6 streaming support.
+* New RigidBody tracking state parameter added to the NatNet stream.
+* IsRecording flag on FrameOfMocapData was added, indicating frame was recorded in Motive.
+* ModelsChanged flag on FrameOfMocapData indicating actively tracked model list has changed.
+* Additional flags on LabelMarkerList indicating marker occlusion and marker position calculation method.
+* Additional FrameOfMocapData timestamp added to the stream.
+* NatCap remote capture sample for illustrating send/receive of Motive remote control commands via UDP direct broadcast.
+* UDP Repeater / Unity3D
+* Increased the unlabeled/other marker count cap to 1000 markers per frame.
+
+Fixes
+
+* SampleClient latency value was incorrectly calculated.
+
+
+__2.5__ _(October 2, 2013)_
 
 Features & Enhancements
 
