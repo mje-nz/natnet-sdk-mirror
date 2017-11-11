@@ -5,6 +5,19 @@ This repository contains each version of NaturalPoint's [NatNet SDK](http://opti
 
 ## Changelog
 
+__3.0.1__ _(November 7, 2017)_
+
+* Cleaned up the SampleClient by removing OtherMarkers sample and refactoring some other code.
+* Updated the PDF user guide.
+* Updated the PacketClient to show correct marker id decoding and marker params usage.
+* Updated samples projects to Visual Studio 2015.
+* Fix for unavailable transmission latency when connecting to Motive via Unicast.
+* Fix for Packet Client showing all markers as unidentified and fix logic in OtherMarker list.
+* Fix for streaming skeletons as rigid bodies setting crashing the SampleClient3D when enabled.
+* Fix for issue with getting data descriptions from a take with markersets.
+
+
+
 __3.0.0__ _(September 8, 2017)_
 
 * Added support for streaming of analog data such as NIDAQ data from Motive.

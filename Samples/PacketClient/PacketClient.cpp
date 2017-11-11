@@ -594,6 +594,15 @@ bool TimecodeStringify(unsigned int inTimecode, unsigned int inTimecodeSubframe,
 	return bValid;
 }
 
+void DecodeMarkerID(int sourceID, int* pOutEntityID, int* pOutMemberID)
+{
+    if (pOutEntityID)
+        *pOutEntityID = sourceID >> 16;
+
+    if (pOutMemberID)
+        *pOutMemberID = sourceID & 0x0000ffff;
+}
+
 // *********************************************************************
 //
 //  Unpack Data:
@@ -663,13 +672,16 @@ void Unpack(char* pData)
 
 	    // Loop through unlabeled markers
         int nOtherMarkers = 0; memcpy(&nOtherMarkers, ptr, 4); ptr += 4;
-        printf("Unidentified Marker Count : %d\n", nOtherMarkers);
+		// OtherMarker list is Deprecated
+        //printf("Unidentified Marker Count : %d\n", nOtherMarkers);
         for(int j=0; j < nOtherMarkers; j++)
         {
             float x = 0.0f; memcpy(&x, ptr, 4); ptr += 4;
             float y = 0.0f; memcpy(&y, ptr, 4); ptr += 4;
             float z = 0.0f; memcpy(&z, ptr, 4); ptr += 4;
-            printf("\tMarker %d : pos = [%3.2f,%3.2f,%3.2f]\n",j,x,y,z);
+            
+			// Deprecated
+			//printf("\tMarker %d : pos = [%3.2f,%3.2f,%3.2f]\n",j,x,y,z);
         }
         
         // Loop through rigidbodies
@@ -776,7 +788,20 @@ void Unpack(char* pData)
 			for (int j=0; j < nLabeledMarkers; j++)
 			{
 				// id
+                // Marker ID Scheme:
+                // Active Markers:
+                //   ID = ActiveID, correlates to RB ActiveLabels list
+                // Passive Markers: 
+                //   If Asset with Legacy Labels
+                //      AssetID 	(Hi Word)
+                //      MemberID	(Lo Word)
+                //   Else
+                //      PointCloud ID
 				int ID = 0; memcpy(&ID, ptr, 4); ptr += 4;
+                int modelID, markerID;
+                DecodeMarkerID(ID, &modelID, &markerID);
+
+
 				// x
 				float x = 0.0f; memcpy(&x, ptr, 4); ptr += 4;
 				// y
@@ -794,6 +819,13 @@ void Unpack(char* pData)
                     bool bOccluded = (params & 0x01) != 0;     // marker was not visible (occluded) in this frame
                     bool bPCSolved = (params & 0x02) != 0;     // position provided by point cloud solve
                     bool bModelSolved = (params & 0x04) != 0;  // position provided by model solve
+                    if ((major >= 3) || (major == 0))
+                    {
+                        bool bHasModel = (params & 0x08) != 0;     // marker has an associated model
+                        bool bUnlabeled = (params & 0x10) != 0;    // marker is an unlabeled marker
+                        bool bActiveMarker = (params & 0x20) != 0; // marker is an active marker
+                    }
+
                 }
 
                 // NatNet version 3.0 and later
@@ -804,7 +836,7 @@ void Unpack(char* pData)
                     memcpy(&residual, ptr, 4); ptr += 4;
                 }
 
-				printf("ID  : %d\n", ID);
+				printf("ID  : [MarkerID: %d] [ModelID: %d]\n", markerID, modelID);
 				printf("pos : [%3.2f,%3.2f,%3.2f]\n", x,y,z);
                 printf("size: [%3.2f]\n", size);
                 printf("err:  [%3.2f]\n", residual);
@@ -903,15 +935,15 @@ void Unpack(char* pData)
         {
             uint64_t cameraMidExposureTimestamp = 0;
             memcpy( &cameraMidExposureTimestamp, ptr, 8 ); ptr += 8;
-            printf( "Mid-exposure timestamp : %"PRIu64"\n", cameraMidExposureTimestamp );
+            printf( "Mid-exposure timestamp : %" PRIu64"\n", cameraMidExposureTimestamp );
 
             uint64_t cameraDataReceivedTimestamp = 0;
             memcpy( &cameraDataReceivedTimestamp, ptr, 8 ); ptr += 8;
-            printf( "Camera data received timestamp : %"PRIu64"\n", cameraDataReceivedTimestamp );
+            printf( "Camera data received timestamp : %" PRIu64"\n", cameraDataReceivedTimestamp );
 
             uint64_t transmitTimestamp = 0;
             memcpy( &transmitTimestamp, ptr, 8 ); ptr += 8;
-            printf( "Transmit timestamp : %"PRIu64"\n", transmitTimestamp );
+            printf( "Transmit timestamp : %" PRIu64"\n", transmitTimestamp );
         }
 
         // frame params

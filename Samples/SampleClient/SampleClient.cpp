@@ -132,7 +132,7 @@ int main( int argc, char* argv[] )
                         snprintf(
 #endif
                             g_discoveredMulticastGroupAddr, sizeof g_discoveredMulticastGroupAddr,
-                            "%"PRIu8".%"PRIu8".%"PRIu8".%"PRIu8"",
+                            "%" PRIu8 ".%" PRIu8".%" PRIu8".%" PRIu8"",
                             discoveredServer.serverDescription.ConnectionMulticastAddress[0],
                             discoveredServer.serverDescription.ConnectionMulticastAddress[1],
                             discoveredServer.serverDescription.ConnectionMulticastAddress[2],
@@ -186,7 +186,7 @@ int main( int argc, char* argv[] )
 
     int iResult;
 
-    // Create NatNet Client
+    // Connect to Motive
     iResult = ConnectClient();
     if (iResult != ErrorCode_OK)
     {
@@ -198,10 +198,10 @@ int main( int argc, char* argv[] )
         printf("Client initialized and ready.\n");
     }
 
-	void* response;
-	int nBytes;
 
-	// send/receive test request
+	// Send/receive test request
+    void* response;
+    int nBytes;
 	printf("[SampleClient] Sending Test Request\n");
 	iResult = g_pClient->SendMessageAndWait("TestRequest", &response, &nBytes);
 	if (iResult == ErrorCode_OK)
@@ -209,7 +209,7 @@ int main( int argc, char* argv[] )
 		printf("[SampleClient] Received: %s", (char*)response);
 	}
 
-	// Retrieve Data Descriptions from server
+	// Retrieve Data Descriptions from Motive
 	printf("\n\n[SampleClient] Requesting Data Descriptions...");
 	sDataDescriptions* pDataDefs = NULL;
 	iResult = g_pClient->GetDataDescriptionList(&pDataDefs);
@@ -449,13 +449,11 @@ void NATNET_CALLCONV ServerDiscoveredCallback( const sNatNetDiscoveredServer* pD
 // Establish a NatNet Client connection
 int ConnectClient()
 {
-    // release previous server
+    // Release previous server
     g_pClient->Disconnect();
 
     // Init Client and connect to NatNet server
-    // to use NatNet default port assignments
     int retCode = g_pClient->Connect( g_connectParams );
-    // to use a different port for commands and/or data:
     if (retCode != ErrorCode_OK)
     {
         printf("Unable to connect to server.  Error code: %d. Exiting", retCode);
@@ -463,6 +461,8 @@ int ConnectClient()
     }
     else
     {
+        // connection succeeded
+
         void* pResult;
         int nBytes = 0;
         ErrorCode ret = ErrorCode_OK;
@@ -509,6 +509,7 @@ int ConnectClient()
 }
 
 // DataHandler receives data from the server
+// This function is called by NatNet when a frame of mocap data is available
 void NATNET_CALLCONV DataHandler(sFrameOfMocapData* data, void* pUserData)
 {
     NatNetClient* pClient = (NatNetClient*) pUserData;
@@ -583,17 +584,6 @@ void NATNET_CALLCONV DataHandler(sFrameOfMocapData* data, void* pUserData)
     NatNet_TimecodeStringify( data->Timecode, data->TimecodeSubframe, szTimecode, 128 );
 	printf("Timecode : %s\n", szTimecode);
 
-	// Other Markers
-	printf("Other Markers [Count=%d]\n", data->nOtherMarkers);
-	for(i=0; i < data->nOtherMarkers; i++)
-	{
-		printf("Other Marker %d : %3.2f\t%3.2f\t%3.2f\n",
-			i,
-			data->OtherMarkers[i][0],
-			data->OtherMarkers[i][1],
-			data->OtherMarkers[i][2]);
-	}
-
 	// Rigid Bodies
 	printf("Rigid Bodies [Count=%d]\n", data->nRigidBodies);
 	for(i=0; i < data->nRigidBodies; i++)
@@ -614,7 +604,7 @@ void NATNET_CALLCONV DataHandler(sFrameOfMocapData* data, void* pUserData)
 			data->RigidBodies[i].qw);
 	}
 
-	// skeletons
+	// Skeletons
 	printf("Skeletons [Count=%d]\n", data->nSkeletons);
 	for(i=0; i < data->nSkeletons; i++)
 	{
@@ -628,21 +618,48 @@ void NATNET_CALLCONV DataHandler(sFrameOfMocapData* data, void* pUserData)
 		}
 	}
 
-	// labeled markers
+	// labeled markers - this includes all markers (Active, Passive, and 'unlabeled' (markers with no asset but a PointCloud ID)
     bool bOccluded;     // marker was not visible (occluded) in this frame
     bool bPCSolved;     // reported position provided by point cloud solve
     bool bModelSolved;  // reported position provided by model solve
-	printf("Labeled Markers [Count=%d]\n", data->nLabeledMarkers);
+    bool bHasModel;     // marker has an associated asset in the data stream
+    bool bUnlabeled;    // marker is 'unlabeled', but has a point cloud ID that matches Motive PointCloud ID (In Motive 3D View)
+	bool bActiveMarker; // marker is an actively labeled LED marker
+
+	printf("Markers [Count=%d]\n", data->nLabeledMarkers);
 	for(i=0; i < data->nLabeledMarkers; i++)
 	{
         bOccluded = ((data->LabeledMarkers[i].params & 0x01)!=0);
         bPCSolved = ((data->LabeledMarkers[i].params & 0x02)!=0);
-        bModelSolved = ((data->LabeledMarkers[i].params & 0x04)!=0);
-		sMarker marker = data->LabeledMarkers[i];
+        bModelSolved = ((data->LabeledMarkers[i].params & 0x04) != 0);
+        bHasModel = ((data->LabeledMarkers[i].params & 0x08) != 0);
+        bUnlabeled = ((data->LabeledMarkers[i].params & 0x10) != 0);
+		bActiveMarker = ((data->LabeledMarkers[i].params & 0x20) != 0);
+
+        sMarker marker = data->LabeledMarkers[i];
+
+        // Marker ID Scheme:
+        // Active Markers:
+        //   ID = ActiveID, correlates to RB ActiveLabels list
+        // Passive Markers: 
+        //   If Asset with Legacy Labels
+        //      AssetID 	(Hi Word)
+        //      MemberID	(Lo Word)
+        //   Else
+        //      PointCloud ID
         int modelID, markerID;
         NatNet_DecodeID( marker.ID, &modelID, &markerID );
-		printf("Labeled Marker [ModelID=%d, MarkerID=%d, Occluded=%d, PCSolved=%d, ModelSolved=%d] [size=%3.2f] [pos=%3.2f,%3.2f,%3.2f]\n",
-            modelID, markerID, bOccluded, bPCSolved, bModelSolved,  marker.size, marker.x, marker.y, marker.z);
+		
+        char szMarkerType[512];
+        if (bActiveMarker)
+            strcpy(szMarkerType, "Active");
+        else if(bUnlabeled)
+            strcpy(szMarkerType, "Unlabeled");
+        else
+            strcpy(szMarkerType, "Labeled");
+
+        printf("%s Marker [ModelID=%d, MarkerID=%d, Occluded=%d, PCSolved=%d, ModelSolved=%d] [size=%3.2f] [pos=%3.2f,%3.2f,%3.2f]\n",
+            szMarkerType, modelID, markerID, bOccluded, bPCSolved, bModelSolved,  marker.size, marker.x, marker.y, marker.z);
 	}
 
     // force plates

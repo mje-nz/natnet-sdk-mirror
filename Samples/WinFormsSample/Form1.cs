@@ -639,18 +639,33 @@ namespace WinFormTestApp
                     if (htRigidBodyMarkers.Contains(activeKey))
                         activeMarker = true;
 
+                    // marker parameters
+                    bool bOccluded = (m.parameters & (1 << 0)) != 0;
+                    bool bPCSolved = (m.parameters & (1 << 1)) != 0;
+                    bool bModelSolved = (m.parameters & (1 << 2)) != 0;
+                    bool bHasModel = (m.parameters & (1 << 3)) != 0;
+                    bool bUnlabeled = (m.parameters & (1 << 4)) != 0;
+
+
                     if(activeMarker)
                     {
                         name = "Active Marker: " + m.ID;
                     }
                     else
                     {
-                        NatNetClientML.DecodeID(m.ID, out assetID, out memberID);
-                        int key = assetID.GetHashCode();
-                        if (htRigidBodies.Contains(key) || htSkelRBs.Contains(key))
-                            name = "Passive Marker (AssetID: " + assetID + "  MemberID: " + memberID + ")";
-                        else 
-                            name = "Passive Marker (PointCloud ID: " + m.ID + ")";
+                        if (bUnlabeled)
+                        {
+                            name = "Unlabeled Marker (PointCloud ID: " + m.ID + ")";
+                        }
+                        else
+                        {
+                            NatNetClientML.DecodeID(m.ID, out assetID, out memberID);
+                            int key = assetID.GetHashCode();
+                            if (htRigidBodies.Contains(key) || htSkelRBs.Contains(key))
+                                name = "Passive Marker (AssetID: " + assetID + "  MemberID: " + memberID + ")";
+                            else
+                                name = "Passive Marker (PointCloud ID: " + m.ID + ")";
+                        }
                     }
 
                     // expand grid if necessary
