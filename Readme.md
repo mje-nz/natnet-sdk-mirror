@@ -2,6 +2,8 @@
 
 This repository contains each version of NaturalPoint's [NatNet SDK](http://optitrack.com/downloads/developer-tools.html).
 
+See also [mje-nz/python_natnet](https://github.com/mje-nz/python_natnet) and [mje-nz/natnet_ros](https://github.com/mje-nz/natnet_ros).
+
 
 ## Changelog
 
