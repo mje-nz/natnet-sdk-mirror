@@ -1,3 +1,18 @@
+//=============================================================================----
+// Copyright © 2016 NaturalPoint, Inc. All Rights Reserved.
+// 
+// This software is provided by the copyright holders and contributors "as is" and
+// any express or implied warranties, including, but not limited to, the implied
+// warranties of merchantability and fitness for a particular purpose are disclaimed.
+// In no event shall NaturalPoint, Inc. or contributors be liable for any direct,
+// indirect, incidental, special, exemplary, or consequential damages
+// (including, but not limited to, procurement of substitute goods or services;
+// loss of use, data, or profits; or business interruption) however caused
+// and on any theory of liability, whether in contract, strict liability,
+// or tort (including negligence or otherwise) arising in any way out of
+// the use of this software, even if advised of the possibility of such damage.
+//=============================================================================----
+
 /*
 NatNetTypes defines the public, common data structures and types
 used when working with NatNetServer and NatNetClient objects.
@@ -57,7 +72,8 @@ version 3.0.0.0
 
 
 // model limits
-#define MAX_MODELS                  200     // maximum number of MarkerSets 
+#define MAX_MODELS                  2000    // maximum number of total models (data descriptions)
+#define MAX_MARKERSETS              1000    // maximum number of MarkerSets 
 #define MAX_RIGIDBODIES             1000    // maximum number of RigidBodies
 #define MAX_NAMELENGTH              256     // maximum length for strings
 #define MAX_MARKERS                 200     // maximum number of markers per MarkerSet
@@ -375,7 +391,7 @@ typedef struct sFrameOfMocapData
     int32_t iFrame;                                 // host defined frame number
 
     int32_t nMarkerSets;                            // # of marker sets in this frame of data
-    sMarkerSetData MocapData[MAX_MODELS];           // MarkerSet data
+    sMarkerSetData MocapData[MAX_MARKERSETS];       // MarkerSet data
 
     int32_t nOtherMarkers;                          // # of undefined markers
     MarkerData* OtherMarkers;                       // undefined marker data
@@ -431,4 +447,4 @@ typedef struct sNatNetClientConnectParams
 // Callback function pointer types
 typedef void (NATNET_CALLCONV* NatNetLogCallback)( Verbosity level, const char* message );
 typedef void (NATNET_CALLCONV* NatNetFrameReceivedCallback)( sFrameOfMocapData* pFrameOfData, void* pUserData );
-typedef int (NATNET_CALLCONV* NatNetServerRequestCallback)( sPacket* pPacketIn, sPacket* pPacketOut, void* pUserData );
+typedef void (NATNET_CALLCONV* NatNetUnknownMessageCallback)( sPacket* pPacket, void* pUserData );

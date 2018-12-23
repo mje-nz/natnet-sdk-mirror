@@ -7,6 +7,23 @@ See also [mje-nz/python_natnet](https://github.com/mje-nz/python_natnet) and [mj
 
 ## Changelog
 
+__3.1.0__ _(September 11, 2018)_
+
+* Updated the sample projects for the Apache Software License. This gives greater open source freedom with the NatNet redistributable.
+* Included additional timing metrics and recording to the WinForms application.
+* Updated the python depacketizer sample to match the correct rigid body descriptions.
+* Updated the SampleClient and SampleClient3D projects, so that they may be used exclusively with unlabeled markers.
+* Updated the explanation of labeled markers in the PacketClient.cpp to be more descriptive.
+* Improved clarity of the version and compilation information for sample applications.
+* Added a broadcast option to the multicast data channel.
+* Fixed a crash when attempting to stream over 99 rigid bodies at one time.
+* Fixed a crash with the WinForms test app by removing the ability to edit text in the IP address combo box.
+* Fixed an issue where the labeled marker list did not report the flags when a labeled marker was occluded.
+* Fixed a bug with automatically determining the IP address on start.
+* Fixed a bug in the WinForms test app that caused it to report incorrect rigid body data in some cases.
+* Fixed a bug in the WinForms test app where it would not refresh when switching between multicast and unicast.
+* Renamed "Labeled Markers" to just "Markers" in the WinForms application.
+
 __3.0.1__ _(November 7, 2017)_
 
 * Cleaned up the SampleClient by removing OtherMarkers sample and refactoring some other code.

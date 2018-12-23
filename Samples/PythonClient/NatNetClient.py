@@ -1,4 +1,20 @@
-﻿import socket
+﻿#Copyright © 2018 Naturalpoint
+#
+#Licensed under the Apache License, Version 2.0 (the "License");
+#you may not use this file except in compliance with the License.
+#You may obtain a copy of the License at
+#
+#http://www.apache.org/licenses/LICENSE-2.0
+#
+#Unless required by applicable law or agreed to in writing, software
+#distributed under the License is distributed on an "AS IS" BASIS,
+#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#See the License for the specific language governing permissions and
+#limitations under the License.
+
+# OptiTrack NatNet direct depacketization library for Python 3.x
+
+import socket
 import struct
 from threading import Thread
 
@@ -14,7 +30,10 @@ DoubleValue = struct.Struct( '<d' )
 class NatNetClient:
     def __init__( self ):
         # Change this value to the IP address of the NatNet server.
-        self.serverIPAddress = "169.254.201.120"
+        self.serverIPAddress = "127.0.0.1" 
+
+        # Change this value to the IP address of your local network interface
+        self.localIPAddress = "127.0.0.1"
 
         # This should match the multicast address listed in Motive's streaming settings.
         self.multicastAddress = "239.255.42.99"
@@ -49,11 +68,12 @@ class NatNetClient:
         result = socket.socket( socket.AF_INET,     # Internet
                               socket.SOCK_DGRAM,
                               socket.IPPROTO_UDP)    # UDP
-        result.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        result.bind( ('', port) )
 
-        mreq = struct.pack("4sl", socket.inet_aton(self.multicastAddress), socket.INADDR_ANY)
-        result.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
+        result.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)        
+        result.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, socket.inet_aton(self.multicastAddress) + socket.inet_aton(self.localIPAddress))
+
+        result.bind( (self.localIPAddress, port) )
+
         return result
 
     # Create a command socket to attach to the NatNet stream
@@ -87,7 +107,7 @@ class NatNetClient:
             self.rigidBodyListener( id, pos, rot )
 
         # RB Marker Data ( Before version 3.0.  After Version 3.0 Marker data is in description )
-        if( self.__natNetStreamVersion[0] < 3 ) :
+        if( self.__natNetStreamVersion[0] < 3  and self.__natNetStreamVersion[0] != 0) :
             # Marker count (4 bytes)
             markerCount = int.from_bytes( data[offset:offset+4], byteorder='little' )
             offset += 4
@@ -113,9 +133,6 @@ class NatNetClient:
                     offset += 4
                     trace( "\tMarker Size", i, ":", size[0] )
                     
-        # Skip padding inserted by the server
-        offset += 4
-
         if( self.__natNetStreamVersion[0] >= 2 ):
             markerError, = FloatValue.unpack( data[offset:offset+4] )
             offset += 4
@@ -344,7 +361,7 @@ class NatNetClient:
         if( self.__natNetStreamVersion[0] >= 2 ):
             name, separator, remainder = bytes(data[offset:]).partition( b'\0' )
             offset += len( name ) + 1
-            trace( "\tMarker Name:", name.decode( 'utf-8' ) )
+            trace( "\tRigidBody Name:", name.decode( 'utf-8' ) )
 
         id = int.from_bytes( data[offset:offset+4], byteorder='little' )
         offset += 4
@@ -355,6 +372,20 @@ class NatNetClient:
         timestamp = Vector3.unpack( data[offset:offset+12] )
         offset += 12
         
+        # Version 3.0 and higher, rigid body marker information contained in description
+        if (self.__natNetStreamVersion[0] >= 3 or self.__natNetStreamVersion[0] == 0 ):
+            markerCount = int.from_bytes( data[offset:offset+4], byteorder='little' ) 
+            offset += 4
+            trace( "\tRigidBody Marker Count:", markerCount )
+
+            markerCountRange = range( 0, markerCount )
+            for marker in markerCountRange:
+                markerOffset = Vector3.unpack(data[offset:offset+12])
+                offset +=12
+            for marker in markerCountRange:
+                activeLabel = int.from_bytes(data[offset:offset+4],byteorder = 'little')
+                offset += 4
+            
         return offset
 
     # Unpack a skeleton description packet

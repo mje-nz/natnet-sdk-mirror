@@ -30,10 +30,6 @@ namespace WinFormTestApp
         {
             this.components = new System.ComponentModel.Container();
             System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle1 = new System.Windows.Forms.DataGridViewCellStyle();
-            System.Windows.Forms.DataVisualization.Charting.ChartArea chartArea1 = new System.Windows.Forms.DataVisualization.Charting.ChartArea();
-            System.Windows.Forms.DataVisualization.Charting.Legend legend1 = new System.Windows.Forms.DataVisualization.Charting.Legend();
-            System.Windows.Forms.DataVisualization.Charting.Series series1 = new System.Windows.Forms.DataVisualization.Charting.Series();
-            System.Windows.Forms.DataVisualization.Charting.Title title1 = new System.Windows.Forms.DataVisualization.Charting.Title();
             System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle2 = new System.Windows.Forms.DataGridViewCellStyle();
             System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle3 = new System.Windows.Forms.DataGridViewCellStyle();
             System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle4 = new System.Windows.Forms.DataGridViewCellStyle();
@@ -45,7 +41,25 @@ namespace WinFormTestApp
             System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle10 = new System.Windows.Forms.DataGridViewCellStyle();
             System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle11 = new System.Windows.Forms.DataGridViewCellStyle();
             System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle12 = new System.Windows.Forms.DataGridViewCellStyle();
+            System.Windows.Forms.DataVisualization.Charting.ChartArea chartArea1 = new System.Windows.Forms.DataVisualization.Charting.ChartArea();
+            System.Windows.Forms.DataVisualization.Charting.Legend legend1 = new System.Windows.Forms.DataVisualization.Charting.Legend();
+            System.Windows.Forms.DataVisualization.Charting.Series series1 = new System.Windows.Forms.DataVisualization.Charting.Series();
+            System.Windows.Forms.DataVisualization.Charting.Title title1 = new System.Windows.Forms.DataVisualization.Charting.Title();
             this.dataGridView1 = new System.Windows.Forms.DataGridView();
+            this.ID = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.X = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.Y = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.Z = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.Yaw = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.Pitch = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.Roll = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.InterframeTime = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.FrameDrop = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.SystemLatency = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.SoftwareLatency = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.TransitLatency = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.TotalLatency = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.Ping = new System.Windows.Forms.DataGridViewTextBoxColumn();
             this.listView1 = new System.Windows.Forms.ListView();
             this.columnHeader1 = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
             this.columnHeader2 = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
@@ -101,18 +115,7 @@ namespace WinFormTestApp
             this.PropertyValueText = new System.Windows.Forms.TextBox();
             this.SetPropertyButton = new System.Windows.Forms.Button();
             this.panel1 = new System.Windows.Forms.Panel();
-            this.ID = new System.Windows.Forms.DataGridViewTextBoxColumn();
-            this.X = new System.Windows.Forms.DataGridViewTextBoxColumn();
-            this.Y = new System.Windows.Forms.DataGridViewTextBoxColumn();
-            this.Z = new System.Windows.Forms.DataGridViewTextBoxColumn();
-            this.Yaw = new System.Windows.Forms.DataGridViewTextBoxColumn();
-            this.Pitch = new System.Windows.Forms.DataGridViewTextBoxColumn();
-            this.Roll = new System.Windows.Forms.DataGridViewTextBoxColumn();
-            this.InterframeTime = new System.Windows.Forms.DataGridViewTextBoxColumn();
-            this.FrameDrop = new System.Windows.Forms.DataGridViewTextBoxColumn();
-            this.SystemLatency = new System.Windows.Forms.DataGridViewTextBoxColumn();
-            this.SoftwareLatency = new System.Windows.Forms.DataGridViewTextBoxColumn();
-            this.TransitLatency = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.RadioBroadcast = new System.Windows.Forms.RadioButton();
             ((System.ComponentModel.ISupportInitialize)(this.dataGridView1)).BeginInit();
             this.contextMenuStrip1.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.chart1)).BeginInit();
@@ -150,17 +153,153 @@ namespace WinFormTestApp
             this.FrameDrop,
             this.SystemLatency,
             this.SoftwareLatency,
-            this.TransitLatency});
+            this.TransitLatency,
+            this.TotalLatency,
+            this.Ping});
             this.dataGridView1.EnableHeadersVisualStyles = false;
             this.dataGridView1.Location = new System.Drawing.Point(3, 0);
             this.dataGridView1.Name = "dataGridView1";
             this.dataGridView1.ReadOnly = true;
             this.dataGridView1.RowHeadersVisible = false;
             this.dataGridView1.RowTemplate.ReadOnly = true;
-            this.dataGridView1.ScrollBars = System.Windows.Forms.ScrollBars.None;
+            this.dataGridView1.ScrollBars = System.Windows.Forms.ScrollBars.Vertical;
             this.dataGridView1.SelectionMode = System.Windows.Forms.DataGridViewSelectionMode.CellSelect;
-            this.dataGridView1.Size = new System.Drawing.Size(854, 474);
+            this.dataGridView1.Size = new System.Drawing.Size(991, 474);
             this.dataGridView1.TabIndex = 1;
+            // 
+            // ID
+            // 
+            this.ID.AutoSizeMode = System.Windows.Forms.DataGridViewAutoSizeColumnMode.None;
+            this.ID.FillWeight = 1000F;
+            this.ID.HeaderText = "ID";
+            this.ID.MinimumWidth = 100;
+            this.ID.Name = "ID";
+            this.ID.ReadOnly = true;
+            this.ID.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
+            this.ID.Width = 150;
+            // 
+            // X
+            // 
+            dataGridViewCellStyle2.Format = "N2";
+            dataGridViewCellStyle2.NullValue = null;
+            this.X.DefaultCellStyle = dataGridViewCellStyle2;
+            this.X.HeaderText = "X";
+            this.X.Name = "X";
+            this.X.ReadOnly = true;
+            this.X.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
+            // 
+            // Y
+            // 
+            dataGridViewCellStyle3.Format = "N2";
+            dataGridViewCellStyle3.NullValue = null;
+            this.Y.DefaultCellStyle = dataGridViewCellStyle3;
+            this.Y.HeaderText = "Y";
+            this.Y.Name = "Y";
+            this.Y.ReadOnly = true;
+            this.Y.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
+            // 
+            // Z
+            // 
+            dataGridViewCellStyle4.Format = "N2";
+            dataGridViewCellStyle4.NullValue = null;
+            this.Z.DefaultCellStyle = dataGridViewCellStyle4;
+            this.Z.HeaderText = "Z";
+            this.Z.Name = "Z";
+            this.Z.ReadOnly = true;
+            this.Z.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
+            // 
+            // Yaw
+            // 
+            dataGridViewCellStyle5.Format = "N2";
+            dataGridViewCellStyle5.NullValue = null;
+            this.Yaw.DefaultCellStyle = dataGridViewCellStyle5;
+            this.Yaw.HeaderText = "Pitch (X)";
+            this.Yaw.Name = "Yaw";
+            this.Yaw.ReadOnly = true;
+            this.Yaw.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
+            // 
+            // Pitch
+            // 
+            dataGridViewCellStyle6.Format = "N2";
+            dataGridViewCellStyle6.NullValue = null;
+            this.Pitch.DefaultCellStyle = dataGridViewCellStyle6;
+            this.Pitch.HeaderText = "Yaw (Y)";
+            this.Pitch.Name = "Pitch";
+            this.Pitch.ReadOnly = true;
+            this.Pitch.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
+            // 
+            // Roll
+            // 
+            dataGridViewCellStyle7.Format = "N2";
+            dataGridViewCellStyle7.NullValue = null;
+            this.Roll.DefaultCellStyle = dataGridViewCellStyle7;
+            this.Roll.HeaderText = "Roll (Z)";
+            this.Roll.Name = "Roll";
+            this.Roll.ReadOnly = true;
+            this.Roll.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
+            // 
+            // InterframeTime
+            // 
+            dataGridViewCellStyle8.Format = "N2";
+            dataGridViewCellStyle8.NullValue = null;
+            this.InterframeTime.DefaultCellStyle = dataGridViewCellStyle8;
+            this.InterframeTime.HeaderText = "Interframe Time";
+            this.InterframeTime.Name = "InterframeTime";
+            this.InterframeTime.ReadOnly = true;
+            this.InterframeTime.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
+            // 
+            // FrameDrop
+            // 
+            dataGridViewCellStyle9.Format = "N2";
+            dataGridViewCellStyle9.NullValue = null;
+            this.FrameDrop.DefaultCellStyle = dataGridViewCellStyle9;
+            this.FrameDrop.HeaderText = "Frame Drops";
+            this.FrameDrop.Name = "FrameDrop";
+            this.FrameDrop.ReadOnly = true;
+            this.FrameDrop.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
+            // 
+            // SystemLatency
+            // 
+            dataGridViewCellStyle10.Format = "N2";
+            this.SystemLatency.DefaultCellStyle = dataGridViewCellStyle10;
+            this.SystemLatency.HeaderText = "Motive System Latency";
+            this.SystemLatency.Name = "SystemLatency";
+            this.SystemLatency.ReadOnly = true;
+            this.SystemLatency.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
+            this.SystemLatency.ToolTipText = "Camnera Photons -> Motive Transmit";
+            // 
+            // SoftwareLatency
+            // 
+            dataGridViewCellStyle11.Format = "N2";
+            this.SoftwareLatency.DefaultCellStyle = dataGridViewCellStyle11;
+            this.SoftwareLatency.HeaderText = "Motive Software Latency";
+            this.SoftwareLatency.Name = "SoftwareLatency";
+            this.SoftwareLatency.ReadOnly = true;
+            this.SoftwareLatency.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
+            this.SoftwareLatency.ToolTipText = "Camera Group -> Motive Transmit";
+            // 
+            // TransitLatency
+            // 
+            dataGridViewCellStyle12.Format = "N2";
+            this.TransitLatency.DefaultCellStyle = dataGridViewCellStyle12;
+            this.TransitLatency.HeaderText = "Transit Latency";
+            this.TransitLatency.Name = "TransitLatency";
+            this.TransitLatency.ReadOnly = true;
+            this.TransitLatency.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
+            this.TransitLatency.ToolTipText = "Motive Transmit -> Client Receive";
+            // 
+            // TotalLatency
+            // 
+            this.TotalLatency.HeaderText = "Total Latency";
+            this.TotalLatency.Name = "TotalLatency";
+            this.TotalLatency.ReadOnly = true;
+            this.TotalLatency.ToolTipText = "Camera Photons -> Client Receive";
+            // 
+            // Ping
+            // 
+            this.Ping.HeaderText = "Ping";
+            this.Ping.Name = "Ping";
+            this.Ping.ReadOnly = true;
             // 
             // listView1
             // 
@@ -173,9 +312,9 @@ namespace WinFormTestApp
             this.listView1.ContextMenuStrip = this.contextMenuStrip1;
             this.listView1.GridLines = true;
             this.listView1.HeaderStyle = System.Windows.Forms.ColumnHeaderStyle.None;
-            this.listView1.Location = new System.Drawing.Point(898, 266);
+            this.listView1.Location = new System.Drawing.Point(1012, 266);
             this.listView1.Name = "listView1";
-            this.listView1.Size = new System.Drawing.Size(382, 220);
+            this.listView1.Size = new System.Drawing.Size(383, 220);
             this.listView1.TabIndex = 3;
             this.listView1.UseCompatibleStateImageBehavior = false;
             this.listView1.View = System.Windows.Forms.View.Details;
@@ -282,7 +421,7 @@ namespace WinFormTestApp
             series1.MarkerStyle = System.Windows.Forms.DataVisualization.Charting.MarkerStyle.Circle;
             series1.Name = "Series1";
             this.chart1.Series.Add(series1);
-            this.chart1.Size = new System.Drawing.Size(1268, 415);
+            this.chart1.Size = new System.Drawing.Size(1383, 415);
             this.chart1.TabIndex = 12;
             this.chart1.Text = "chart1";
             title1.Font = new System.Drawing.Font("Segoe UI", 14.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
@@ -299,9 +438,9 @@ namespace WinFormTestApp
             this.label1.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
             this.label1.Font = new System.Drawing.Font("Microsoft Sans Serif", 10F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.label1.ForeColor = System.Drawing.SystemColors.ControlText;
-            this.label1.Location = new System.Drawing.Point(898, 246);
+            this.label1.Location = new System.Drawing.Point(1012, 246);
             this.label1.Name = "label1";
-            this.label1.Size = new System.Drawing.Size(382, 21);
+            this.label1.Size = new System.Drawing.Size(383, 21);
             this.label1.TabIndex = 13;
             this.label1.Text = "Messages";
             // 
@@ -312,14 +451,15 @@ namespace WinFormTestApp
             this.tabControl1.Controls.Add(this.tabPage1);
             this.tabControl1.Controls.Add(this.tabPage2);
             this.tabControl1.Controls.Add(this.tabPage3);
-            this.tabControl1.Location = new System.Drawing.Point(898, 12);
+            this.tabControl1.Location = new System.Drawing.Point(1012, 12);
             this.tabControl1.Name = "tabControl1";
             this.tabControl1.SelectedIndex = 0;
-            this.tabControl1.Size = new System.Drawing.Size(382, 227);
+            this.tabControl1.Size = new System.Drawing.Size(383, 227);
             this.tabControl1.TabIndex = 21;
             // 
             // tabPage1
             // 
+            this.tabPage1.Controls.Add(this.RadioBroadcast);
             this.tabPage1.Controls.Add(this.LabeledMarkersCheckBox);
             this.tabPage1.Controls.Add(this.PollCheckBox);
             this.tabPage1.Controls.Add(this.RecordDataButton);
@@ -341,7 +481,7 @@ namespace WinFormTestApp
             this.tabPage1.Location = new System.Drawing.Point(4, 22);
             this.tabPage1.Name = "tabPage1";
             this.tabPage1.Padding = new System.Windows.Forms.Padding(3);
-            this.tabPage1.Size = new System.Drawing.Size(374, 201);
+            this.tabPage1.Size = new System.Drawing.Size(375, 201);
             this.tabPage1.TabIndex = 0;
             this.tabPage1.Text = "Connect";
             this.tabPage1.UseVisualStyleBackColor = true;
@@ -351,9 +491,9 @@ namespace WinFormTestApp
             this.LabeledMarkersCheckBox.AutoSize = true;
             this.LabeledMarkersCheckBox.Location = new System.Drawing.Point(217, 40);
             this.LabeledMarkersCheckBox.Name = "LabeledMarkersCheckBox";
-            this.LabeledMarkersCheckBox.Size = new System.Drawing.Size(105, 17);
+            this.LabeledMarkersCheckBox.Size = new System.Drawing.Size(64, 17);
             this.LabeledMarkersCheckBox.TabIndex = 30;
-            this.LabeledMarkersCheckBox.Text = "Labeled Markers";
+            this.LabeledMarkersCheckBox.Text = "Markers";
             this.LabeledMarkersCheckBox.UseVisualStyleBackColor = true;
             // 
             // PollCheckBox
@@ -436,6 +576,7 @@ namespace WinFormTestApp
             // 
             // comboBoxLocal
             // 
+            this.comboBoxLocal.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
             this.comboBoxLocal.FormattingEnabled = true;
             this.comboBoxLocal.Location = new System.Drawing.Point(58, 15);
             this.comboBoxLocal.Name = "comboBoxLocal";
@@ -520,7 +661,7 @@ namespace WinFormTestApp
             this.tabPage2.Location = new System.Drawing.Point(4, 22);
             this.tabPage2.Name = "tabPage2";
             this.tabPage2.Padding = new System.Windows.Forms.Padding(3);
-            this.tabPage2.Size = new System.Drawing.Size(374, 201);
+            this.tabPage2.Size = new System.Drawing.Size(375, 201);
             this.tabPage2.TabIndex = 1;
             this.tabPage2.Text = "Commands";
             this.tabPage2.UseVisualStyleBackColor = true;
@@ -673,7 +814,7 @@ namespace WinFormTestApp
             this.tabPage3.Controls.Add(this.SetPropertyButton);
             this.tabPage3.Location = new System.Drawing.Point(4, 22);
             this.tabPage3.Name = "tabPage3";
-            this.tabPage3.Size = new System.Drawing.Size(374, 201);
+            this.tabPage3.Size = new System.Drawing.Size(375, 201);
             this.tabPage3.TabIndex = 2;
             this.tabPage3.Text = "Properties";
             this.tabPage3.UseVisualStyleBackColor = true;
@@ -772,133 +913,25 @@ namespace WinFormTestApp
             this.panel1.Controls.Add(this.dataGridView1);
             this.panel1.Location = new System.Drawing.Point(12, 12);
             this.panel1.Name = "panel1";
-            this.panel1.Size = new System.Drawing.Size(880, 474);
+            this.panel1.Size = new System.Drawing.Size(998, 474);
             this.panel1.TabIndex = 22;
             // 
-            // ID
+            // RadioBroadcast
             // 
-            this.ID.AutoSizeMode = System.Windows.Forms.DataGridViewAutoSizeColumnMode.None;
-            this.ID.FillWeight = 1000F;
-            this.ID.HeaderText = "ID";
-            this.ID.MinimumWidth = 100;
-            this.ID.Name = "ID";
-            this.ID.ReadOnly = true;
-            this.ID.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
-            this.ID.Width = 150;
-            // 
-            // X
-            // 
-            dataGridViewCellStyle2.Format = "N2";
-            dataGridViewCellStyle2.NullValue = null;
-            this.X.DefaultCellStyle = dataGridViewCellStyle2;
-            this.X.HeaderText = "X";
-            this.X.Name = "X";
-            this.X.ReadOnly = true;
-            this.X.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
-            // 
-            // Y
-            // 
-            dataGridViewCellStyle3.Format = "N2";
-            dataGridViewCellStyle3.NullValue = null;
-            this.Y.DefaultCellStyle = dataGridViewCellStyle3;
-            this.Y.HeaderText = "Y";
-            this.Y.Name = "Y";
-            this.Y.ReadOnly = true;
-            this.Y.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
-            // 
-            // Z
-            // 
-            dataGridViewCellStyle4.Format = "N2";
-            dataGridViewCellStyle4.NullValue = null;
-            this.Z.DefaultCellStyle = dataGridViewCellStyle4;
-            this.Z.HeaderText = "Z";
-            this.Z.Name = "Z";
-            this.Z.ReadOnly = true;
-            this.Z.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
-            // 
-            // Yaw
-            // 
-            dataGridViewCellStyle5.Format = "N2";
-            dataGridViewCellStyle5.NullValue = null;
-            this.Yaw.DefaultCellStyle = dataGridViewCellStyle5;
-            this.Yaw.HeaderText = "Pitch (X)";
-            this.Yaw.Name = "Yaw";
-            this.Yaw.ReadOnly = true;
-            this.Yaw.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
-            // 
-            // Pitch
-            // 
-            dataGridViewCellStyle6.Format = "N2";
-            dataGridViewCellStyle6.NullValue = null;
-            this.Pitch.DefaultCellStyle = dataGridViewCellStyle6;
-            this.Pitch.HeaderText = "Yaw (Y)";
-            this.Pitch.Name = "Pitch";
-            this.Pitch.ReadOnly = true;
-            this.Pitch.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
-            // 
-            // Roll
-            // 
-            dataGridViewCellStyle7.Format = "N2";
-            dataGridViewCellStyle7.NullValue = null;
-            this.Roll.DefaultCellStyle = dataGridViewCellStyle7;
-            this.Roll.HeaderText = "Roll (Z)";
-            this.Roll.Name = "Roll";
-            this.Roll.ReadOnly = true;
-            this.Roll.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
-            // 
-            // InterframeTime
-            // 
-            dataGridViewCellStyle8.Format = "N2";
-            dataGridViewCellStyle8.NullValue = null;
-            this.InterframeTime.DefaultCellStyle = dataGridViewCellStyle8;
-            this.InterframeTime.HeaderText = "Interframe Time";
-            this.InterframeTime.Name = "InterframeTime";
-            this.InterframeTime.ReadOnly = true;
-            this.InterframeTime.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
-            // 
-            // FrameDrop
-            // 
-            dataGridViewCellStyle9.Format = "N2";
-            dataGridViewCellStyle9.NullValue = null;
-            this.FrameDrop.DefaultCellStyle = dataGridViewCellStyle9;
-            this.FrameDrop.HeaderText = "Frame Drops";
-            this.FrameDrop.Name = "FrameDrop";
-            this.FrameDrop.ReadOnly = true;
-            this.FrameDrop.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
-            // 
-            // SystemLatency
-            // 
-            dataGridViewCellStyle10.Format = "N2";
-            this.SystemLatency.DefaultCellStyle = dataGridViewCellStyle10;
-            this.SystemLatency.HeaderText = "System Latency";
-            this.SystemLatency.Name = "SystemLatency";
-            this.SystemLatency.ReadOnly = true;
-            this.SystemLatency.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
-            // 
-            // SoftwareLatency
-            // 
-            dataGridViewCellStyle11.Format = "N2";
-            this.SoftwareLatency.DefaultCellStyle = dataGridViewCellStyle11;
-            this.SoftwareLatency.HeaderText = "Software Latency";
-            this.SoftwareLatency.Name = "SoftwareLatency";
-            this.SoftwareLatency.ReadOnly = true;
-            this.SoftwareLatency.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
-            // 
-            // TransitLatency
-            // 
-            dataGridViewCellStyle12.Format = "N2";
-            this.TransitLatency.DefaultCellStyle = dataGridViewCellStyle12;
-            this.TransitLatency.HeaderText = "Transit Latency";
-            this.TransitLatency.Name = "TransitLatency";
-            this.TransitLatency.ReadOnly = true;
-            this.TransitLatency.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
+            this.RadioBroadcast.AutoSize = true;
+            this.RadioBroadcast.Location = new System.Drawing.Point(197, 73);
+            this.RadioBroadcast.Name = "RadioBroadcast";
+            this.RadioBroadcast.Size = new System.Drawing.Size(73, 17);
+            this.RadioBroadcast.TabIndex = 31;
+            this.RadioBroadcast.Text = "Broadcast";
+            this.RadioBroadcast.UseVisualStyleBackColor = true;
             // 
             // Form1
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.BackColor = System.Drawing.Color.Gainsboro;
-            this.ClientSize = new System.Drawing.Size(1292, 919);
+            this.ClientSize = new System.Drawing.Size(1407, 919);
             this.Controls.Add(this.tabControl1);
             this.Controls.Add(this.label1);
             this.Controls.Add(this.chart1);
@@ -993,6 +1026,9 @@ namespace WinFormTestApp
         private System.Windows.Forms.DataGridViewTextBoxColumn SystemLatency;
         private System.Windows.Forms.DataGridViewTextBoxColumn SoftwareLatency;
         private System.Windows.Forms.DataGridViewTextBoxColumn TransitLatency;
+        private System.Windows.Forms.DataGridViewTextBoxColumn TotalLatency;
+        private System.Windows.Forms.DataGridViewTextBoxColumn Ping;
+        private System.Windows.Forms.RadioButton RadioBroadcast;
     }
 }
 

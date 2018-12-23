@@ -1,17 +1,17 @@
-//=============================================================================
-// Copyright © 2014 NaturalPoint, Inc. All Rights Reserved.
-// 
-// This software is provided by the copyright holders and contributors "as is" and
-// any express or implied warranties, including, but not limited to, the implied
-// warranties of merchantability and fitness for a particular purpose are disclaimed.
-// In no event shall NaturalPoint, Inc. or contributors be liable for any direct,
-// indirect, incidental, special, exemplary, or consequential damages
-// (including, but not limited to, procurement of substitute goods or services;
-// loss of use, data, or profits; or business interruption) however caused
-// and on any theory of liability, whether in contract, strict liability,
-// or tort (including negligence or otherwise) arising in any way out of
-// the use of this software, even if advised of the possibility of such damage.
-//=============================================================================
+/* 
+Copyright © 2012 NaturalPoint Inc.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License. */
 
 /*
 
@@ -777,7 +777,8 @@ void Unpack(char* pData)
             } // next skeleton
         }
         
-		// labeled markers (NatNet version 2.3 and later)
+        // labeled markers (NatNet version 2.3 and later)
+        // labeled markers - this includes all markers: Active, Passive, and 'unlabeled' (markers with no asset but a PointCloud ID)
 		if( ((major == 2)&&(minor>=3)) || (major>2))
 		{
 			int nLabeledMarkers = 0;
@@ -821,9 +822,9 @@ void Unpack(char* pData)
                     bool bModelSolved = (params & 0x04) != 0;  // position provided by model solve
                     if ((major >= 3) || (major == 0))
                     {
-                        bool bHasModel = (params & 0x08) != 0;     // marker has an associated model
-                        bool bUnlabeled = (params & 0x10) != 0;    // marker is an unlabeled marker
-                        bool bActiveMarker = (params & 0x20) != 0; // marker is an active marker
+                        bool bHasModel = (params & 0x08) != 0;     // marker has an associated asset in the data stream
+                        bool bUnlabeled = (params & 0x10) != 0;    // marker is 'unlabeled', but has a point cloud ID
+                        bool bActiveMarker = (params & 0x20) != 0; // marker is an actively labeled LED marker
                     }
 
                 }

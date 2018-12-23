@@ -1,17 +1,17 @@
-//=============================================================================
-// Copyright © 2009 NaturalPoint, Inc. All Rights Reserved.
-// 
-// This software is provided by the copyright holders and contributors "as is" and
-// any express or implied warranties, including, but not limited to, the implied
-// warranties of merchantability and fitness for a particular purpose are disclaimed.
-// In no event shall NaturalPoint, Inc. or contributors be liable for any direct,
-// indirect, incidental, special, exemplary, or consequential damages
-// (including, but not limited to, procurement of substitute goods or services;
-// loss of use, data, or profits; or business interruption) however caused
-// and on any theory of liability, whether in contract, strict liability,
-// or tort (including negligence or otherwise) arising in any way out of
-// the use of this software, even if advised of the possibility of such damage.
-//=============================================================================
+/* 
+Copyright © 2012 NaturalPoint Inc.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License. */
 
 using System;
 using System.IO;
@@ -28,6 +28,9 @@ using System.Runtime.InteropServices;
 
 using NatNetML;
 using System.Reflection;
+
+using System.Net.NetworkInformation;
+using System.Text;
 
 /*
  *
@@ -46,8 +49,10 @@ using System.Reflection;
  * 
  */
 
+
 namespace WinFormTestApp
 {
+
     public partial class Form1 : Form
     {
         // Helper class for discovering NatNet servers.
@@ -62,6 +67,9 @@ namespace WinFormTestApp
         // Time that has passed since the NatNet server transmitted m_FrameOfData.
         private double m_FrameOfDataTransitLatency;
 
+        // Total Latency : Time between mid-camera-exposure to client available
+        private double m_TotalLatency;
+
         // [NatNet] Description of the Active Model List from the server (e.g. Motive)
         NatNetML.ServerDescription desc = new NatNetML.ServerDescription();
 
@@ -73,6 +81,7 @@ namespace WinFormTestApp
 
         // Records the age of each frame in m_FrameQueue at the time it arrived.
         private Queue<double> m_FrameTransitLatencies = new Queue<double>();
+        private Queue<double> m_TotalLatencies = new Queue<double>();
 
         // data grid
         Hashtable htMarkers = new Hashtable();
@@ -104,6 +113,7 @@ namespace WinFormTestApp
         private int droppedFrameIndicator = 0;
 
         // server information
+        string mServerIP = "";
         double m_ServerFramerate = 1.0f;
         float m_ServerToMillimeters = 1.0f;
         int m_UpAxis = 1;   // 0=x, 1=y, 2=z (Y default)
@@ -125,9 +135,21 @@ namespace WinFormTestApp
         Thread pollThread;
         bool mPolling = false;
 
+        // ping time
+        delegate void PingCallback();
+        Thread UpdatePingTimeThread;
+        private double mLastPingTimeMs;
+
         // recording
         bool mRecording = false;
         TextWriter mWriter;
+
+        // auto-connect
+        bool mWantAutoconnect = true;
+        bool mServerDetected= false;
+        bool mServerEstablished = false;
+        string mDetectedLocalIP = "";
+        string mDetectedServerIP = "";
 
 
         public Form1()
@@ -137,21 +159,7 @@ namespace WinFormTestApp
 
         private void Form1_Load(object sender, EventArgs e)
         {
-            m_Discovery.OnServerDiscovered += delegate( NatNetML.DiscoveredServer server )
-            {
-                OutputMessage( String.Format(
-                    "Discovered server: {0} {1}.{2} at {3} (local interface: {4})",
-                    server.ServerDesc.HostApp,
-                    server.ServerDesc.HostAppVersion[0],
-                    server.ServerDesc.HostAppVersion[1],
-                    server.ServerAddress,
-                    server.LocalAddress
-                ) );
-            };
-
-            m_Discovery.StartDiscovery();
-
-            // Show available ip addresses of this machine
+             // Show available ip addresses of this machine
             String strMachineName = Dns.GetHostName();
             IPHostEntry ipHost = Dns.GetHostByName(strMachineName);
             foreach (IPAddress ip in ipHost.AddressList)
@@ -160,7 +168,8 @@ namespace WinFormTestApp
                 comboBoxLocal.Items.Add(strIP);
             }
             int selected = comboBoxLocal.Items.Add("127.0.0.1");
-            comboBoxLocal.SelectedItem = comboBoxLocal.Items[selected];
+            //comboBoxLocal.SelectedItem = comboBoxLocal.Items[selected];
+
 
             // create NatNet client
             int iResult = CreateClient();
@@ -211,7 +220,7 @@ namespace WinFormTestApp
                 {
                     try
                     {
-                        this.Invoke(pd);
+                        pd.Invoke();
                         Thread.Sleep(15);
                     }
                     catch (System.Exception ex)
@@ -221,6 +230,47 @@ namespace WinFormTestApp
                     }
                 }
             });
+
+            // create and run a ping time thread
+            PingCallback pingCallback = new PingCallback(UpdatePing);
+            UpdatePingTimeThread = new Thread(() =>
+            {
+                while (mApplicationRunning)
+                {
+                    try
+                    {
+                        pingCallback.Invoke();
+                        Thread.Sleep(30);
+                    }
+                    catch (System.Exception ex)
+                    {
+                        OutputMessage(ex.Message);
+                        break;
+                    }
+                }
+            });
+            UpdatePingTimeThread.Start();
+
+            // Auto-connect to first detected Motive
+            m_Discovery.OnServerDiscovered += delegate (NatNetML.DiscoveredServer server)
+            {
+                OutputMessage(String.Format(
+                    "Discovered server: {0} {1}.{2} at {3} (local interface: {4})",
+                    server.ServerDesc.HostApp,
+                    server.ServerDesc.HostAppVersion[0],
+                    server.ServerDesc.HostAppVersion[1],
+                    server.ServerAddress,
+                    server.LocalAddress
+                ));
+
+                if (!mServerDetected)
+                {
+                    mDetectedLocalIP = server.LocalAddress.ToString();
+                    mDetectedServerIP = server.ServerAddress.ToString();
+                    mServerDetected = true;
+                }
+            };
+            m_Discovery.StartDiscovery();
 
         }
 
@@ -269,7 +319,19 @@ namespace WinFormTestApp
             string strServerIP = textBoxServer.Text;
 
             NatNetClientML.ConnectParams connectParams = new NatNetClientML.ConnectParams();
-            connectParams.ConnectionType = RadioUnicast.Checked ? ConnectionType.Unicast : ConnectionType.Multicast;
+            if(RadioUnicast.Checked)
+            {
+                connectParams.ConnectionType = ConnectionType.Unicast;
+            }
+            else if(RadioMulticast.Checked)
+            {
+                connectParams.ConnectionType = ConnectionType.Multicast;
+            }
+            else if(RadioBroadcast.Checked)
+            {
+                connectParams.ConnectionType = ConnectionType.Multicast;
+                connectParams.MulticastAddress = "255.255.255.255";
+            }
             connectParams.ServerAddress = strServerIP;
             connectParams.LocalAddress = strLocalIP;
             returnCode = m_NatNet.Connect( connectParams );
@@ -291,7 +353,11 @@ namespace WinFormTestApp
                 OutputMessage("   Server App Name: " + desc.HostApp);
                 OutputMessage(String.Format("   Server App Version: {0}.{1}.{2}.{3}", desc.HostAppVersion[0], desc.HostAppVersion[1], desc.HostAppVersion[2], desc.HostAppVersion[3]));
                 OutputMessage(String.Format("   Server NatNet Version: {0}.{1}.{2}.{3}", desc.NatNetVersion[0], desc.NatNetVersion[1], desc.NatNetVersion[2], desc.NatNetVersion[3]));
+
                 checkBoxConnect.Text = "Disconnect";
+                mServerEstablished = true;
+                mServerIP = String.Format("{0}.{1}.{2}.{3}", desc.HostComputerAddress[0], desc.HostComputerAddress[1], desc.HostComputerAddress[2], desc.HostComputerAddress[3]);
+
 
                 // Tracking Tools and Motive report in meters - lets convert to millimeters
                 if (desc.HostApp.Contains("TrackingTools") || desc.HostApp.Contains("Motive"))
@@ -545,7 +611,7 @@ namespace WinFormTestApp
                     NatNetML.RigidBodyData rb = sk.RigidBodies[j];
                     int skeletonID = HighWord(rb.ID);
                     int rigidBodyID = LowWord(rb.ID);
-                    int uniqueID = skeletonID * 1000 + rigidBodyID;
+                    int uniqueID = GetUniqueRBKey(skeletonID, rigidBodyID);
                     int key = uniqueID.GetHashCode();
                     int rowIndex = -1;
                     if (htRigidBodies.ContainsKey(key))
@@ -715,23 +781,34 @@ namespace WinFormTestApp
                 // Update Frame drop detection
                 dataGridView1.Rows[0].Cells[8].Value = droppedFrameIndicator;
 
-                // System latency
-                bool bSystemLatencyAvailable = m_FrameOfData.CameraMidExposureTimestamp != 0;
-                double systemLatencyMs = bSystemLatencyAvailable ?
-                    (m_FrameOfData.TransmitTimestamp - m_FrameOfData.CameraMidExposureTimestamp) / (double)desc.HighResClockFrequency * 1000.0
-                    : 0.0;
-                dataGridView1.Rows[0].Cells[9].Value = systemLatencyMs.ToString( "F3" );
+                bool bMotiveHardwareLatenciesAvailable = m_FrameOfData.CameraMidExposureTimestamp != 0;
+                double systemLatencyMs = -1.0f;
+                double totalLatencyMs = -1.0f;
+                if (bMotiveHardwareLatenciesAvailable)
+                {
+                    // Motive System latency ( Camera Photons -> Motive Transmit)
+                    systemLatencyMs = (m_FrameOfData.TransmitTimestamp - m_FrameOfData.CameraMidExposureTimestamp) / (double)desc.HighResClockFrequency * 1000.0;
 
-                // Software latency
-                bool bSoftwareLatencyAvailable = m_FrameOfData.CameraDataReceivedTimestamp != 0;
-                double softwareLatencyMs = bSoftwareLatencyAvailable ?
+                    // Total latency ( Camera Photons -> Client Receive )
+                    totalLatencyMs = m_TotalLatency;
+                }
+                dataGridView1.Rows[0].Cells[9].Value = systemLatencyMs.ToString("F3");
+                dataGridView1.Rows[0].Cells[12].Value = totalLatencyMs.ToString("F3");
+
+                // Motive Software latency ( Frame Group ->  Motive Trasmit )
+                bool bMotiveLatenciesAvailable = m_FrameOfData.CameraDataReceivedTimestamp != 0;
+                double softwareLatencyMs = bMotiveLatenciesAvailable ?
                     (m_FrameOfData.TransmitTimestamp - m_FrameOfData.CameraDataReceivedTimestamp) / (double)desc.HighResClockFrequency * 1000.0
-                    : 0.0;
+                    : -1.0;
                 dataGridView1.Rows[0].Cells[10].Value = softwareLatencyMs.ToString( "F3" );
 
-                // Transit latency (time between NatNet server frame transmission and client reception)
-                double transitLatencyMs = m_FrameOfDataTransitLatency * 1000.0;
+                // Transmit latency ( Motive Transmit -> Client Receive )
+                double transitLatencyMs = m_FrameOfDataTransitLatency;
                 dataGridView1.Rows[0].Cells[11].Value = transitLatencyMs.ToString( "F3" );
+
+                // Ping ( Client -> Server -> Client )
+                dataGridView1.Rows[0].Cells[13].Value = mLastPingTimeMs.ToString("F3");
+
             }
 
             if ( dataGridView1.Rows.Count != mLastRowCount )
@@ -741,6 +818,11 @@ namespace WinFormTestApp
                 newHeight = Math.Max(newHeight, minGridHeight);
                 dataGridView1.Height = newHeight;
             }
+        }
+
+        int GetUniqueRBKey(int skeletonID, int rigidBodyID)
+        {
+            return (skeletonID+1) * 1000 + rigidBodyID;
         }
 
         /// <summary>
@@ -850,12 +932,12 @@ namespace WinFormTestApp
                             OutputMessage(" OffsetZ  : " + rb.offsetz);
 
                             //mRigidBodies.Add(rb);
-                            int key = sk.ID * 1000 + rb.ID;
+                            int key = GetUniqueRBKey(sk.ID, rb.ID);
                             htSkelRBs.Add(key, rb);
 #if false
                             int rowIndex = dataGridView1.Rows.Add("Bone: " + rb.Name);
                             // RigidBodyIDToRow map
-                            int uniqueID = sk.ID * 1000 + rb.ID;
+                            int uniqueID = GetUniqueRBKey(sk.ID, rb.ID);
                             int key = uniqueID.GetHashCode();
                             if (htRigidBodies.ContainsKey(key))
                                 MessageBox.Show("Duplicate RigidBody ID");
@@ -925,17 +1007,36 @@ namespace WinFormTestApp
 
         void ProcessFrameOfData(ref NatNetML.FrameOfMocapData data)
         {
+
+            TelemetryData telemetry = new TelemetryData();
+            bool bMotiveHardwareLatenciesAvailable = data.CameraMidExposureTimestamp != 0;
+            if (bMotiveHardwareLatenciesAvailable)
+            {
+                telemetry.TotalLatency = m_NatNet.SecondsSinceHostTimestamp(data.CameraMidExposureTimestamp) * 1000.0;
+                telemetry.MotiveTotalLatency = (data.TransmitTimestamp - data.CameraMidExposureTimestamp) / (double)desc.HighResClockFrequency * 1000.0;
+            }
+            bool bMotiveLatenciesAvailable = data.CameraDataReceivedTimestamp != 0;
+            if(bMotiveLatenciesAvailable)
+            {
+            }
+            telemetry.TransmitLatency = m_NatNet.SecondsSinceHostTimestamp(data.TransmitTimestamp) * 1000.0;
+
+
             // detect and reported any 'reported' frame drop (as reported by server)
             if (m_fLastFrameTimestamp != 0.0f)
             {
                 double framePeriod = 1.0f / m_ServerFramerate;
                 double thisPeriod = data.fTimestamp - m_fLastFrameTimestamp;
+                double delta = thisPeriod - framePeriod;
                 double fudgeFactor = 0.002f; // 2 ms
-                if ((thisPeriod - framePeriod) > fudgeFactor)
+                if (delta > fudgeFactor)
                 {
                     //OutputMessage("Frame Drop: ( ThisTS: " + data.fTimestamp.ToString("F3") + "  LastTS: " + m_fLastFrameTimestamp.ToString("F3") + " )");
-                    mDroppedFrames++;
-                    droppedFrameIndicator = 10;
+                    double missingPeriod = delta / framePeriod;
+                    int nMissing = (int)(missingPeriod + 0.5);
+                    mDroppedFrames += nMissing;
+                    telemetry.DroppedFrames = nMissing;
+                    droppedFrameIndicator = 10; // for graphing only
                 }
                 else
                 {
@@ -984,7 +1085,10 @@ namespace WinFormTestApp
                     m_FrontQueue.Enqueue(deepCopy);
                 
                     m_FrameTransitLatencies.Clear();
-                    m_FrameTransitLatencies.Enqueue( m_NatNet.SecondsSinceHostTimestamp( data.TransmitTimestamp ) );
+                    m_FrameTransitLatencies.Enqueue(telemetry.TransmitLatency);
+
+                    m_TotalLatencies.Clear();
+                    m_TotalLatencies.Enqueue(telemetry.TotalLatency);
                 }
                 else 
                 {
@@ -1000,7 +1104,7 @@ namespace WinFormTestApp
             // recording : write packet to data file
             if (mRecording)
             {
-                WriteFrame(deepCopy);
+                WriteFrame(deepCopy, telemetry);
             }
 
             mLastFrame = data.iFrame;
@@ -1110,41 +1214,53 @@ namespace WinFormTestApp
         }
 
 
-        private void WriteFrame(FrameOfMocapData data)
+        private void WriteFrame(FrameOfMocapData data, TelemetryData telemetry)
         {
-            String str =  "";
+            String str = "";
+            bool recordMarkerData = false;
+            bool recordForcerData = false;
+            bool recordRBData = false;
 
             str += data.fTimestamp.ToString("F3") + "\t";
+            str += telemetry.TransmitLatency.ToString("F3") + "\t";
+            str += telemetry.TotalLatency.ToString("F3") + "\t";
+            str += telemetry.DroppedFrames.ToString() + "\t";
 
             // 'all' markerset data
-            for (int i = 0; i < m_FrameOfData.nMarkerSets; i++)
+            if(recordMarkerData)
             {
-                NatNetML.MarkerSetData ms = m_FrameOfData.MarkerSets[i];
-                if(ms.MarkerSetName == "all")
+                for (int i = 0; i < m_FrameOfData.nMarkerSets; i++)
                 {
-                   for (int j = 0; j < ms.nMarkers; j++)
+                    NatNetML.MarkerSetData ms = m_FrameOfData.MarkerSets[i];
+                    if(ms.MarkerSetName == "all")
                     {
-                       str += ms.Markers[j].x.ToString("F3") + "\t";
-                       str += ms.Markers[j].y.ToString("F3") + "\t";
-                       str += ms.Markers[j].z.ToString("F3") + "\t";
+                       for (int j = 0; j < ms.nMarkers; j++)
+                        {
+                           str += ms.Markers[j].x.ToString("F3") + "\t";
+                           str += ms.Markers[j].y.ToString("F3") + "\t";
+                           str += ms.Markers[j].z.ToString("F3") + "\t";
+                        }
                     }
                 }
             }
 
             // force plates
-            // just write first subframe from each channel (fx[0], fy[0], fz[0], mx[0], my[0], mz[0])
-            for (int i = 0; i < m_FrameOfData.nForcePlates; i++)
+            if(recordForcerData)
             {
-                NatNetML.ForcePlateData fp = m_FrameOfData.ForcePlates[i];
-                for(int iChannel=0; iChannel < fp.nChannels; iChannel++)
+                // just write first subframe from each channel (fx[0], fy[0], fz[0], mx[0], my[0], mz[0])
+                for (int i = 0; i < m_FrameOfData.nForcePlates; i++)
                 {
-                    if(fp.ChannelData[iChannel].nFrames == 0)
+                    NatNetML.ForcePlateData fp = m_FrameOfData.ForcePlates[i];
+                    for(int iChannel=0; iChannel < fp.nChannels; iChannel++)
                     {
-                        str += 0.0f;    // empty frame
-                    }
-                    else
-                    {
-                        str += fp.ChannelData[iChannel].Values[0] + "\t";
+                        if(fp.ChannelData[iChannel].nFrames == 0)
+                        {
+                            str += 0.0f;    // empty frame
+                        }
+                        else
+                        {
+                            str += fp.ChannelData[iChannel].Values[0] + "\t";
+                        }
                     }
                 }
             }
@@ -1176,6 +1292,20 @@ namespace WinFormTestApp
 
         private void UpdateUI()
         {
+            if(mWantAutoconnect && mServerDetected && !mServerEstablished)
+            {
+                OutputMessage("Auto-Connecting to Motive...");
+
+                int index = comboBoxLocal.FindString(mDetectedLocalIP);
+                if (index >= 0)
+                    comboBoxLocal.SelectedIndex = index;
+                textBoxServer.Text = mDetectedServerIP;
+
+                checkBoxConnect.Checked = true; // calls connect
+                GetDataDescriptions();
+
+            }
+
             // The frame queue is a shared resource with the FrameOfMocap delivery thread, so lock it while reading
             bool lockAcquired = false;
             try
@@ -1196,6 +1326,9 @@ namespace WinFormTestApp
                             m_FrameOfData = m_FrontQueue.Dequeue();
                         while (m_FrameTransitLatencies.Count > 0)
                             m_FrameOfDataTransitLatency = m_FrameTransitLatencies.Dequeue();
+                        while (m_TotalLatencies.Count > 0)
+                            m_TotalLatency = m_TotalLatencies.Dequeue();
+
 
                         Monitor.Exit(FrontQueueLock);
                         lockAcquired = false;
@@ -1270,14 +1403,20 @@ namespace WinFormTestApp
         {
             bool bNeedReconnect = checkBoxConnect.Checked;
             if (bNeedReconnect)
+            {
+                Disconnect();
                 Connect();
+            }
         }
 
         private void RadioUnicast_CheckedChanged(object sender, EventArgs e)
         {
             bool bNeedReconnect = checkBoxConnect.Checked;
             if (bNeedReconnect)
+            {
+                Disconnect();
                 Connect();
+            }
         }
 
         private void RecordButton_Click(object sender, EventArgs e)
@@ -1636,12 +1775,56 @@ namespace WinFormTestApp
             }
         }
 
-      
-    }
+        void UpdatePing()
+        {
+            if (mServerIP.Length == 0)
+                return;
 
-    // Wrapper class for the windows high performance timer QueryPerfCounter
-    // ( adapted from MSDN https://msdn.microsoft.com/en-us/library/ff650674.aspx )
-    public class QueryPerfCounter
+            Ping pingSender = new Ping();
+            PingOptions options = new PingOptions();
+
+            // Use the default Ttl value which is 128,
+            // but change the fragmentation behavior.
+            options.DontFragment = true;
+
+            // Create a buffer of 32 bytes of data to be transmitted.
+            string data = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+            byte[] buffer = Encoding.ASCII.GetBytes(data);
+            int timeout = 120;
+
+            try
+            {
+                PingReply reply = pingSender.Send(mServerIP, timeout, buffer, options);
+                if (reply.Status == IPStatus.Success)
+                {
+                    mLastPingTimeMs = reply.RoundtripTime;
+                }
+                else
+                {
+                    reply = pingSender.Send("192.168.1.1", timeout, buffer, options);
+                    if (reply.Status == IPStatus.Success)
+                    {
+                        mLastPingTimeMs = reply.RoundtripTime;
+                    }
+                    else
+                    {
+                        mLastPingTimeMs = -1.0;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+
+                OutputMessage("Ping Failed : " + ex.Message);
+            }
+
+        }
+
+}
+
+// Wrapper class for the windows high performance timer QueryPerfCounter
+// ( adapted from MSDN https://msdn.microsoft.com/en-us/library/ff650674.aspx )
+public class QueryPerfCounter
     {
         [DllImport("KERNEL32")]
         private static extern bool QueryPerformanceCounter(out long lpPerformanceCount);
@@ -1680,6 +1863,14 @@ namespace WinFormTestApp
             val = val / 1000000.0f;   // convert to ms
             return val;
         }
+    }
+
+    public class TelemetryData
+    {
+        public double MotiveTotalLatency = -1.0;
+        public double TransmitLatency = -1.0;
+        public double TotalLatency = -1.0;
+        public int DroppedFrames = 0;
     }
 
 }
